@@ -8,7 +8,7 @@ Personal AI command center for one user (Afshin). Turns messy input into tasks, 
 - `/docs/decisions.md` is the decision log. One dated entry per decision, with the rejected alternative.
 
 ## Current phase
-Phase 1: authoritative data model, projects, tasks, events, online text Inbox extraction, privacy guard, Proposal + action log, persistence, and the defined single-user authentication baseline. Do not start Phase 2 work (scheduler, calendar UI) until Phase 1 exit criteria in the spec are met.
+Phase 1: authoritative data model, projects, tasks, events, notes, online text Inbox extraction, privacy guard, Proposal + action log, persistence, and the defined single-user authentication baseline. Do not start Phase 2 work (scheduler, calendar UI) until Phase 1 exit criteria in the spec are met.
 
 ## Non-negotiable rules
 1. AI never mutates state directly. Every AI-originated or scheduler-originated change is a Proposal: validate, approve by policy, apply internal mutations transactionally, and log. Reversible internal mutations support conflict-aware undo. Irreversible external actions, once introduced after V1, require explicit confirmation and an immutable audit record; they are not described as undoable.

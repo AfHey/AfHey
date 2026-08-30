@@ -12,8 +12,8 @@ Status: current. Defined before Phase 1 implementation; keep current thereafter.
 - Tests: Vitest for unit/integration tests; Playwright for end-to-end tests
 - AI providers: OpenAI behind `ExtractionProvider` and `TextReasoningProvider`. Phase 1 extraction uses the pinned `gpt-5.4-mini-2026-03-17` snapshot through the Responses API with JSON-schema Structured Outputs, gated by the versioned extraction evaluation. The Phase 3b reasoning model is selected and pinned before that phase.
 - Phase 1 dictation: device/browser dictation only (iPhone keyboard microphone or browser Speech API) for non-sensitive content; no uploaded audio or external transcription API
-- Authentication: one provisioned user, no public registration; password or passkey, secure server-side sessions, CSRF protection, session revocation, and rate limits on AI endpoints
-- Storage security: hosting-provider encryption at rest; no application-managed field-level encryption in V1; processed raw captures are deleted after 30 days
+- Authentication: one provisioned user, no public registration; password or passkey `Credential` rows, database-backed `Session` rows with rotation and revocation, CSRF protection, and rate limits on authentication and AI endpoints
+- Storage security: hosting-provider encryption at rest; no application-managed field-level encryption in V1; processed raw and redacted Capture text and evidence literals are deleted after 30 days
 
 ## Service boundaries
 - `ai/adapters/` : TextReasoningProvider, ExtractionProvider, TranscriptionProvider, VoiceRealtimeProvider
@@ -21,7 +21,9 @@ Status: current. Defined before Phase 1 implementation; keep current thereafter.
 - `core/proposals/` : Proposal creation, validation, tier policy, transactional apply, action log, conflict-aware undo
 - `core/scheduler/` : deterministic scheduling engine and composed operations
 - `core/tools/` : tool registry (primitives + composed operations), stable ID conventions, tier per tool
-- `db/` : Prisma schema and migrations
+- `core/auth/` : single-user credential and session management, CSRF defense, and rate limiting for authentication and AI endpoints
+- `jobs/` : scheduled maintenance, including the Capture-text and evidence-literal expiry job
+- `db/` : Prisma schema and migrations, evolved per the product-spec Section 9 “Phase 1 migration boundary”
 
 ## Data flow
 Capture or request -> privacy guard immediately before transmission -> LLM interpretation -> Proposal -> schema/business validation -> approval policy -> internal database transaction -> action log -> conflict-aware undo when reversible
