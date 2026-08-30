@@ -27,7 +27,26 @@ Fill `.env` values as needed. `.env` is gitignored; long-lived secrets stay serv
 
 ### Database setup
 
-Added in Step 2 of `docs/phase-1-plan.md` (local PostgreSQL via Homebrew); this section is updated there.
+Local development uses Homebrew PostgreSQL 18 (installed as 18.6 on 2026-08-30):
+
+```bash
+brew install postgresql@18
+brew services start postgresql@18
+PGBIN=/opt/homebrew/opt/postgresql@18/bin
+$PGBIN/psql -d postgres -c "CREATE ROLE afhey LOGIN CREATEDB PASSWORD 'afhey'"
+$PGBIN/createdb -O afhey afhey_dev
+$PGBIN/createdb -O afhey afhey_test
+```
+
+The `afhey` role has `CREATEDB` so Prisma Migrate can manage its shadow database. `afhey_dev` backs the app (`DATABASE_URL`); `afhey_test` backs the Vitest database suites (`TEST_DATABASE_URL`), which reset it — never point `TEST_DATABASE_URL` at a database with data you care about.
+
+Verify everything with:
+
+```bash
+npm run db:check
+```
+
+To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey_dev && $PGBIN/createdb -O afhey afhey_dev`), then run migrations.
 
 ## Commands
 
