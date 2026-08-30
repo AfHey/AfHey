@@ -44,3 +44,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+
+# prisma generated client (run `prisma generate`)
+/src/db/generated/
