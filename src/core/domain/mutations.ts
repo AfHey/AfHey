@@ -45,7 +45,7 @@ const isoDateOrNull = (v: string | null | undefined) =>
 const timeOrNull = (v: string | null | undefined) =>
   v === undefined ? undefined : v === null ? null : timeOfDayToDb(v);
 
-function toTaskData(input: TaskUpdateInput) {
+export function toTaskData(input: TaskUpdateInput) {
   return {
     title: input.title,
     taskKind: input.taskKind,
@@ -78,7 +78,7 @@ function toTaskData(input: TaskUpdateInput) {
   };
 }
 
-async function assertProjectRefIsProject(tx: Tx, projectId: string | null | undefined) {
+export async function assertProjectRefIsProject(tx: Tx, projectId: string | null | undefined) {
   if (!projectId) return;
   const project = await tx.project.findUnique({ where: { id: projectId } });
   if (!project || project.kind !== "project") {
@@ -156,7 +156,7 @@ export async function uncompleteTaskDirect(db: PrismaClient, id: string) {
 
 // --- Event ----------------------------------------------------------------
 
-function toEventData(input: EventUpdateInput) {
+export function toEventData(input: EventUpdateInput) {
   return {
     title: input.title,
     kind: input.kind,
@@ -335,7 +335,7 @@ export const archiveEntity = (db: PrismaClient, entity: Archivable, id: string) 
 export const restoreEntity = (db: PrismaClient, entity: Archivable, id: string) =>
   setArchived(db, entity, id, null);
 
-function stripUndefined<T extends object>(obj: T): Partial<T> {
+export function stripUndefined<T extends object>(obj: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined),
   ) as Partial<T>;
