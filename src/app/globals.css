@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
+/* AfHey "dusk ledger" tokens: warm paper, violet-cast ink, one brass accent.
+   Brass is reserved for state that matters (priority gauge, active nav,
+   focus); danger only for overdue. Dark mode flips the raw values so every
+   utility class stays theme-agnostic. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #faf9f7;
+  --surface: #ffffff;
+  --ink: #211f26;
+  --ink-soft: #6c6875;
+  --line: #e8e6e1;
+  --brass: #8f6e1f;
+  --brass-soft: #f0e9d6;
+  --danger: #b3402e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #161519;
+    --surface: #1f1e24;
+    --ink: #edebe6;
+    --ink-soft: #99949e;
+    --line: #2c2a32;
+    --brass: #c9a55c;
+    --brass-soft: #322b1c;
+    --danger: #e06a54;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-brass: var(--brass);
+  --color-brass-soft: var(--brass-soft);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-public-sans), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+}
+
+@layer components {
+  .display {
+    font-family: var(--font-fraunces), Georgia, serif;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-brass;
+  }
+  .label {
+    @apply text-xs font-medium tracking-wide text-ink-soft;
+  }
+  .btn-primary,
+  .btn-ghost,
+  .btn-quiet {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-ink text-paper hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply border border-line text-ink hover:border-ink-soft;
+  }
+  .btn-quiet {
+    @apply px-2 py-1 text-ink-soft hover:text-ink;
+  }
+  .empty-line {
+    @apply text-lg text-ink-soft italic;
+    font-family: var(--font-fraunces), Georgia, serif;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

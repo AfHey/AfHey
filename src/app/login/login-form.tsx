@@ -35,23 +35,19 @@ export function LoginForm() {
 
   return (
     <form onSubmit={submit} className="flex w-full max-w-xs flex-col gap-4">
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Password</span>
+      <label className="flex flex-col gap-1.5">
+        <span className="label">Password</span>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoFocus
           required
-          className="rounded-lg border border-zinc-300 px-3 py-2 outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"
+          className="input"
         />
       </label>
-      {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-      >
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <button type="submit" disabled={busy} className="btn-primary">
         {busy ? "Signing in…" : "Sign in"}
       </button>
     </form>

@@ -47,3 +47,6 @@ next-env.d.ts
 
 # prisma generated client (run `prisma generate`)
 /src/db/generated/
+
+# playwright auth state
+/playwright/.auth/

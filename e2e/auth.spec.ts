@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-// Runs against the dev database; the user is provisioned with the password in
-// AFHEY_E2E_PASSWORD (see README and .env.example).
+// These specs exercise the unauthenticated and login flows themselves, so
+// they run without the shared storage state.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const PASSWORD = process.env.AFHEY_E2E_PASSWORD;
 
 test("redirects unauthenticated visitors to login", async ({ page }) => {
@@ -15,9 +17,9 @@ test("signs in and out", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password").fill(PASSWORD!);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page).toHaveURL(/\/tasks$/);
 
+  await page.goto("/settings");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
 });

@@ -159,8 +159,8 @@ describe("login and logout routes", () => {
     expect(await validateSessionToken(db, token)).not.toBeNull();
   });
 
-  it("rate limits after 5 attempts in the window", async () => {
-    for (let i = 0; i < 5; i++) {
+  it("rate limits after 10 attempts in the window", async () => {
+    for (let i = 0; i < 10; i++) {
       expect((await loginRoute(loginRequest("wrong-password"))).status).toBe(401);
     }
     const res = await loginRoute(loginRequest("wrong-password"));

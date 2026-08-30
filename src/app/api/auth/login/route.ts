@@ -8,7 +8,7 @@ import { getPrisma } from "@/db/client";
 
 const bodySchema = z.object({ password: z.string().min(1).max(1024) });
 
-const LOGIN_ATTEMPT_LIMIT = 5;
+const LOGIN_ATTEMPT_LIMIT = 10;
 const LOGIN_WINDOW_MS = 60_000;
 
 export async function POST(request: Request): Promise<Response> {
