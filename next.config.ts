@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Native module; must not be bundled.
+  serverExternalPackages: ["argon2"],
 };
 
 export default nextConfig;

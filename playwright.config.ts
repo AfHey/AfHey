@@ -1,4 +1,11 @@
+import { loadEnvFile } from "node:process";
 import { defineConfig, devices } from "@playwright/test";
+
+try {
+  loadEnvFile();
+} catch {
+  // No .env — rely on the process environment.
+}
 
 // Dedicated port so E2E runs never collide with a manually started dev server.
 const PORT = 3799;
