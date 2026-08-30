@@ -8,17 +8,100 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: GitHub MCP plugin (authentication failed; `gh` CLI covers the need).
 
 ## 2026-08-30 Scope
-- Decision: AfHey (conversational control layer) is part of V1 architecture; text chat in Phase 3, voice in Phase 4.
-- Decision: `waiting_for` is a first-class item type from Phase 1; automatic detection deferred to Phase 5.
+- Decision: AfHey (conversational control layer) is part of V1 architecture; text chat in Phase 3, voice in Phase 4. `[Superseded by decisions.md entry: 2026-08-30 Release boundaries and phase ownership]` Text is specifically Phase 3b/V1 and voice is Phase 4/V1.1.
+- Decision: `waiting_for` is a first-class item type from Phase 1; automatic detection deferred to Phase 5. `[Superseded by decisions.md entry: 2026-08-30 Task kinds]`
 - Decision: One unified Proposal model for Inbox, scheduler, and AfHey actions.
 
 ## 2026-08-30 Voice
-- Decision: Voice layer will target the documented OpenAI Realtime API model current at Phase 4 (gpt-realtime-2.1 as of today). GPT-Live is not assumed to be API-available.
+- Decision: Voice layer will target the documented OpenAI Realtime API model current at Phase 4 (gpt-realtime-2.1 as of today). GPT-Live is not assumed to be API-available. `[Superseded by decisions.md entry: 2026-08-30 Voice and provider boundaries]` No exact Phase 4 model ID is frozen before that phase.
 
 ## Pending
-- Calendar rendering library
-- Date library
-- Extraction and reasoning model selection
-- Transcription provider for Phase 1
-- Hosting and backups
-- Tier 2 scope thresholds
+- Calendar rendering library — decide before Phase 2
+- Exact Phase 3b text-reasoning model — decide before Phase 3b
+- Hosting and backups — decide before Phase 1 deployment
+- Tier 2 scope thresholds — decide before Phase 3a
+
+## 2026-08-30 Release boundaries and phase ownership
+- Decision: V1 ends after Phase 3b (AfHey text); Phase 4 voice is V1.1; Phases 5 and 6 are V2. Basic search belongs to Phase 2. Command palette, keyboard shortcuts, export, and erasure belong to Phase 3b. Weekly review belongs to Phase 5.
+- Rejected: treating Phases 4–6 as undifferentiated V1, or leaving cross-cutting requirements without a build phase.
+- Reason: gives every requirement an owner and prevents integrations, ambient voice, and offline work from blocking a useful text-first V1.
+
+## 2026-08-30 Capture, offline, and multimodal scope
+- Decision: Phase 1 Inbox is online text only: typed, pasted, or text supplied by non-sensitive device/browser dictation. Images/screenshots, uploaded audio, PWA share target, offline queue/cache, and other multimodal input are Phase 5 (V2).
+- Rejected: Phase 1 screenshot/PWA sharing and offline capture.
+- Reason: removes contradictory scope and avoids designing additional raw-data stores before the core privacy and Proposal flow is proven.
+
+## 2026-08-30 Voice and provider boundaries
+- Decision: Phase 1 uses iPhone keyboard microphone or browser Speech API only for non-sensitive dictation; AfHey stores no audio and uses no external transcription API. Realtime conversational voice is Phase 4 (V1.1) using OpenAI behind `VoiceRealtimeProvider`. Server mediation is required for extraction/reasoning; browser/realtime client transport may use only short-lived, scoped server-issued credentials.
+- Rejected: external Phase 1 transcription, treating voice memo dictation and realtime AfHey voice as one feature, and claiming transcript redaction protects audio already sent to a provider.
+- Reason: makes the privacy boundary and client/server exception explicit.
+
+## 2026-08-30 Task kinds
+- Decision: `waiting_for` and `reminder` are Task kinds in `task_kind: action | waiting_for | reminder`, not separate tables. Waiting-for requires a Person; reminder requires a reminder instant/zone. Automatic waiting-for detection is Phase 5; notification delivery is Phase 6.
+- Rejected: separate Reminder/WaitingFor tables and the ambiguous “first-class type or task state.”
+- Reason: one lifecycle and query model is sufficient while preserving distinct invariants.
+
+## 2026-08-30 Authoritative Phase 1 data model
+- Decision: use the explicit enums, nullability, relationships, and invariants in product-spec Section 9. All mutable domain entities use opaque UUIDs and integer revisions. Task/Event people use join tables; Capture→Proposal is one-to-many; source text is held only in Capture with field evidence spans. WorkSession is the source of truth for actual duration. `Project` is one hierarchy table with `kind: area | project` and one area→project level in V1.
+- Rejected: conceptual “might contain” schemas, array-valued people fields, duplicated Task `source_text`, Capture `proposal_id`, cached Task actual duration, and ambiguous Area/Project models.
+- Reason: Prisma migrations and Proposal concurrency require one enforceable schema.
+
+## 2026-08-30 Scheduled blocks and task timing
+- Decision: scheduled work is Event `kind = block` with required `task_id`; one Task may have many blocks. Planned work dates are derived from blocks and `do_date` is not stored. `schedule_type = fixed` is an intrinsic commitment; `is_locked` is only a user pin on a flexible Event. A passed block without an outcome becomes `missed_unconfirmed`, which does not assert user failure.
+- Rejected: canonical Task `do_date`, conflating fixed with locked, and automatically treating elapsed blocks as missed work.
+- Reason: supports split work without drift or destructive scheduler assumptions.
+
+## 2026-08-30 Timezone and DST semantics
+- Decision: `UserSettings.current_timezone` is an IANA zone defaulting to `America/New_York`. Flexible preferences follow the current zone while travelling; fixed Events retain their stored zone and instant. Date-only values remain calendar dates; timed values store UTC instants plus a separate IANA zone; all-day Events store local dates plus zone. Nonexistent and duplicated DST times require confirmation under product-spec Section 8.1.
+- Rejected: midnight-UTC dates, UTC instants without original zones, silent DST shifts, and making all preferences fixed to the home zone.
+- Reason: each temporal concept now has one deterministic storage and travel rule.
+
+## 2026-08-30 Scheduling estimates, constraints, and priorities
+- Decision: feasibility and scheduling use explicit `remaining_estimate_minutes`; elapsed work is never subtracted to infer remaining work. Tasks without an estimate remain unscheduled and request confirmation. Hard-unavailable windows are distinct from soft preferences; working hours are configurable data. Store manual `user_priority` separately from required 0–100 `computed_priority_score` (default 50); manual wins, otherwise 70+ is Must, 40–69 Should, and below 40 Could.
+- Rejected: invented durations, `estimate - actual` remaining work, hard-coded 07:00–15:30 logic, treating all time outside working hours as invalid, and allowing AI recomputation to overwrite a manual priority.
+- Reason: scheduling remains deterministic without pretending uncertain inputs are facts.
+
+## 2026-08-30 Proposal concurrency, execution, and undo
+- Decision: Proposals and operations use revisions, unique idempotency keys, operation IDs, preallocated create UUIDs, explicit sequence/dependencies, expanded terminal states, and final-set tier recomputation for tiered policy. Apply rechecks revisions and commits internal mutations plus ActionLog atomically. Undo is a new conflict-detecting Proposal referencing the original Action; unsafe batch undo applies nothing. Phase 1 Inbox uses explicit approval with no tier engine. Origins share a model/review primitives but may use different presentations.
+- Rejected: unordered operations, nullable create IDs, trusted stored tiers, five-state Proposals, blind inverse replay, automatic Phase 1 Inbox execution, and a mandatory single Proposal UI component.
+- Reason: prevents retry duplication, stale overwrites, partial batches, and destruction of later work.
+
+## 2026-08-30 External action execution deferral
+- Decision: the external-action execution model is deferred to Phase 5 (review item 7); no external side effect is implemented in V1.
+- Rejected: designing that model during Phase 1.
+- Reason: explicit product-owner deferral keeps V1 internal.
+
+## 2026-08-30 Extraction provider, contract, and evaluation
+- Decision: OpenAI is the Phase 1 extraction provider. Use pinned snapshot `gpt-5.4-mini-2026-03-17` through the Responses API with JSON-schema Structured Outputs behind `ExtractionProvider`; it must pass the versioned extraction evaluation before use. The [official model page](https://developers.openai.com/api/docs/models/gpt-5.4-mini) records that snapshot and Structured Outputs support. Provider output uses response-local item references, stable-ID candidates/unresolved entities, literal temporal expressions, and per-field evidence/confidence; trusted code preallocates final entity/operation UUIDs while building the Proposal. Deterministic code resolves dates and validates business invariants. One call is a target with at most two bounded retries. Phase 3b text reasoning also uses OpenAI, with its exact pinned model chosen before that phase.
+- Rejected: free-text project/person references, authoritative LLM datetimes, exact whole-output online regression tests, an absolute one-call invariant, unpinned Phase 1 model choice, and provider SDK calls outside adapters.
+- Reason: provides a concrete Phase 1 dependency while preserving replaceable business boundaries and measurable quality.
+
+## 2026-08-30 IDs and conversational references
+- Decision: database/tool IDs are full opaque UUIDs. Short labels are presentation-only handles persisted in per-turn reference sets and resolved to UUIDs against the exact referenced Message/turn.
+- Rejected: globally short database IDs and one mutable “last returned list.”
+- Reason: prevents collisions and cross-tab/long-conversation reference errors.
+
+## 2026-08-30 Privacy and untrusted content
+- Decision: all provider-bound context is guarded immediately before transmission; records can be `ai_excluded`; user edits trigger a fresh full-payload guard. People/glossary entries are not redaction whitelists. The guard is a last-resort leakage detector, not de-identification or a HIPAA boundary. Pasted/retrieved/tool content is untrusted data and cannot authorize actions.
+- Rejected: guarding only new captures, trusting known names, treating redaction as reliable de-identification, and allowing edited redactions or embedded instructions to bypass policy.
+- Reason: the non-PHI policy remains primary and every provider path has the same enforceable boundary.
+
+## 2026-08-30 Storage security and retention
+- Decision: V1 uses hosting-provider disk/database encryption only; no application-managed field-level keys. Raw Capture text is deleted 30 days after processing and is not copied into domain rows or logs. Expanded encryption/key design is deferred to the Phase 5 security review (review item 43).
+- Rejected: claiming unspecified raw-capture encryption or designing a key hierarchy before the host and V2 sensitive-data scope exist.
+- Reason: matches the product-owner risk decision while making retention enforceable.
+
+## 2026-08-30 Authentication, export, erasure, and deletion
+- Decision: provision one user with no registration; password or passkey, secure server sessions/cookies, CSRF defense, rotation/revocation, and auth/AI rate limits. V1 export/erasure covers domain data, archives, retained Captures, Proposals/ActionLogs, Conversations/Messages, references, and settings. Project removal is archive/soft-delete; hard delete is rejected while dependents/audit references exist. Backup retention is disclosed after hosting selection.
+- Rejected: undefined “simple auth,” hard-cascade project deletion, and exports/erasure that silently omit audit or conversation data.
+- Reason: single-user does not remove internet-hosting security or data-portability obligations.
+
+## 2026-08-30 Libraries and tests
+- Decision: Luxon for dates; Zod at LLM boundaries; Vitest for unit/integration tests; Playwright for end-to-end tests. Calendar rendering library remains a Phase 2 decision.
+- Rejected: leaving the date/test stack for implementation to invent and prematurely selecting a calendar UI library.
+- Reason: Phase 1 dependencies are fixed while a Phase 2-only choice remains appropriately gated.
+
+## 2026-08-30 Specification history and fixtures
+- Decision: replaced requirements remain in place with `[Superseded by decisions.md entry: ...]`; deferrals include phase/reason. Specification examples are illustrative only and cannot be copied into seed/evaluation/test data, which must be wholly fictional and non-sensitive.
+- Rejected: deleting history, leaving contradictory requirements simultaneously active, and reusing recognizable names/institutions/study labels in fixtures.
+- Reason: preserves auditability without confusing the implementer or risking sensitive sample data.
