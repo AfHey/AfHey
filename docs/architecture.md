@@ -18,6 +18,7 @@ Status: current. Defined before Phase 1 implementation; keep current thereafter.
 ## Service boundaries
 - `ai/adapters/` : TextReasoningProvider, ExtractionProvider, TranscriptionProvider, VoiceRealtimeProvider
 - `ai/redaction/` : deterministic privacy guard for all provider-bound context, with tests; records marked `ai_excluded` are never provider input
+- `core/resolution/` : deterministic entity resolution — lexicon over People/aliases/Projects/glossary, opaque placeholder substitution merged with the guard, candidate-ID context for the provider
 - `core/proposals/` : Proposal creation, validation, tier policy, transactional apply, action log, conflict-aware undo
 - `core/scheduler/` : deterministic scheduling engine and composed operations
 - `core/tools/` : tool registry (primitives + composed operations), stable ID conventions, tier per tool
