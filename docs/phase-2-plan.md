@@ -1,6 +1,6 @@
 # Phase 2 Implementation Plan — Time
 
-**Status:** Proposed 2026-09-05; awaiting product-owner approval before any code is written.
+**Status:** Approved 2026-09-05 with every Section 9 open item confirmed as proposed (recorded in `decisions.md`, "Phase 2 plan approved; open items resolved"). Step 1 complete 2026-09-05 (FullCalendar 7.1.0 pinned, no fallback; see the calendar decision's spike result). Step 2 awaits the product owner's go-ahead.
 **Basis:** `product-spec.md` Sections 4–5, 7, 8.3, 9–11, 15 (Phase 2 exit criteria), 17–19; `architecture.md`; every `decisions.md` entry through 2026-09-05, including "Calendar rendering library: FullCalendar v7 standard packages" and "Week view promoted to Phase 2"; the Phase 1 independent review and verification (both closed).
 
 ## 1. Scope summary

@@ -20,6 +20,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@fullcalendar/react": "7.1.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "argon2": "^0.45.1",
@@ -28,6 +29,7 @@
     "openai": "^7.8.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "temporal-polyfill": "1.0.4",
     "zod": "^4.5.4"
   },
   "devDependencies": {

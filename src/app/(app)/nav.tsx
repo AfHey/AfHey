@@ -18,6 +18,12 @@ const ICONS: Record<string, React.ReactNode> = {
       <path d="M2 6.5h12M5.5 2v3M10.5 2v3" />
     </>
   ),
+  calendar: (
+    <>
+      <rect x="2" y="3.5" width="12" height="10.5" rx="1.5" />
+      <path d="M2 6.5h12M6 6.5v7.5M10 6.5v7.5M2 10h12" />
+    </>
+  ),
   projects: (
     <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2h4.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7Z" />
   ),
@@ -44,6 +50,7 @@ const ICONS: Record<string, React.ReactNode> = {
 
 const ITEMS = [
   { href: "/inbox", label: "Inbox", icon: "inbox" },
+  { href: "/calendar", label: "Calendar", icon: "calendar" },
   { href: "/tasks", label: "Tasks", icon: "tasks" },
   { href: "/events", label: "Events", icon: "events" },
   { href: "/projects", label: "Projects", icon: "projects" },

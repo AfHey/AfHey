@@ -81,3 +81,12 @@ Hosting-side scheduling is decided with the hosting decision (spec §19).
 ## Stack versions (recorded at Step 1, 2026-08-30)
 
 Next.js 16.3.3 · React 19.2.8 · TypeScript 5 · Tailwind CSS 4 · Prisma 7.10.0 · Luxon 3.7.2 · Zod 4.5.4 · Vitest 4.1.11 · Playwright 1.62.1 · tsx 4 (dev-only)
+
+Phase 2 (recorded at Step 1, 2026-09-05): FullCalendar `@fullcalendar/react` 7.1.0 (standard MIT packages: time-grid, interaction, Breezy theme plugin) · temporal-polyfill 1.0.4. Both are pinned exactly.
+
+## Calendar rendering notes
+
+- The calendar is a client component (`src/app/(app)/calendar/calendar-view.tsx`). The grid renders client-only behind a hydration-safe gate: FullCalendar formats ranges with `Intl`, and Node's ICU and the browser's ICU disagree on the invisible spacing in strings such as "10:00 – 10:30", which made React reject the server HTML. The page shell is still server-rendered.
+- In v7 the theme is a plugin (`@fullcalendar/react/themes/breezy`) plus three stylesheets (`skeleton.css`, the theme, a palette). Without the plugin the grid renders unstyled and never emits resize handles.
+- Per-event classes are one string (`className`), read back in tests as `.afhey-event`; time zones are named zones handled by Temporal, so events are passed as UTC instants and the library shifts them.
+- Touch: drag, resize, and selection start after a long press (`longPressDelay` 400 ms, selection 500 ms). The e2e phone spec drives this through Chromium's touch emulation; a physical iPhone pass remains a manual check.
