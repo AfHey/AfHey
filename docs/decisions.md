@@ -140,3 +140,8 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Decision: evaluation `eval-v1` against `gpt-5.4-mini-2026-03-17` with prompt `p2-2026-09-05` passed every acceptance check (item precision/recall 100%, task/event kind 100%, temporal literal recall 100%, reference recall 100%, evidence validity 100%, 0 hallucinated ids; report `docs/evals/eval-v1-p2-2026-09-05-openai.md`). The gate is therefore satisfied, but live extraction (`EXTRACTION_PROVIDER=openai`) is switched on only by the product owner's explicit instruction; the default stays the deterministic fake provider. The dataset must grow with realistic (fictional) captures before the numbers are treated as representative — 33 cases authored alongside the prompt is a floor, not proof.
 - Rejected: enabling live extraction automatically on a passing run; treating a single 33-case pass as sufficient evidence of real-world quality.
 - Reason: keeps the human decision the spec requires for provider use while recording the measured result.
+
+## 2026-09-05 Live extraction enabled
+- Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
+- Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
+- Reason: the gate the extraction decision required has been passed and the owner has made the call explicitly.
