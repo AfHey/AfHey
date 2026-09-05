@@ -21,6 +21,9 @@ export interface ProposalView {
   id: string;
   status: string;
   conflictDetails: unknown;
+  failureReason: string | null;
+  /** True when recovery marked this proposal failed after an interrupted apply. */
+  recoverable: boolean;
   operations: OperationView[];
 }
 

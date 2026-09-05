@@ -59,12 +59,26 @@ export interface RecoveryOutcome {
 }
 
 /**
- * Startup recovery: any proposal stuck in `applying` either committed its
- * ActionLog (→ applied) or did not (→ failed with a recovery note, eligible
- * for re-approval).
+ * Execution lease (finding 3, 2026-09-05): the CAS into `applying` stamps
+ * updatedAt; a worker's apply transaction finishes within seconds (the
+ * interactive-transaction timeout is 5s), so an `applying` row older than
+ * this lease belongs to an interrupted worker, never to an active one.
  */
-export async function recoverApplyingProposals(db: PrismaClient): Promise<RecoveryOutcome[]> {
-  const stuck = await db.proposal.findMany({ where: { status: "applying" } });
+export const APPLY_LEASE_MS = 2 * 60 * 1000;
+
+/**
+ * Recovery: any proposal stuck in `applying` past its lease either committed
+ * its ActionLog (→ applied) or did not (→ failed with a recovery note,
+ * eligible for re-approval). Rows inside the lease are left to their worker.
+ * Runs on Inbox load and from the maintenance job.
+ */
+export async function recoverApplyingProposals(
+  db: PrismaClient,
+  now: Date = new Date(),
+): Promise<RecoveryOutcome[]> {
+  const stuck = await db.proposal.findMany({
+    where: { status: "applying", updatedAt: { lt: new Date(now.getTime() - APPLY_LEASE_MS) } },
+  });
   const outcomes: RecoveryOutcome[] = [];
   for (const proposal of stuck) {
     const action = await db.actionLog.findUnique({ where: { proposalId: proposal.id } });

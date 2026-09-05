@@ -457,7 +457,9 @@ function ReviewProposal({ capture, proposal, options }: { capture: CaptureView; 
         <p className="mt-3 text-sm text-danger">
           {proposal.status === "conflicted"
             ? `This review conflicts with later changes: ${JSON.stringify(proposal.conflictDetails)}`
-            : "Applying this review failed; edit an item to rebuild it, or reject."}
+            : proposal.recoverable
+              ? "Applying this review was interrupted before it completed. Nothing was saved. Re-check and apply, or reject."
+              : "Applying this review failed; edit an item to rebuild it, or reject."}
         </p>
       ) : null}
       {result ? <p className="mt-3 text-sm text-danger">{result}</p> : null}
@@ -466,6 +468,24 @@ function ReviewProposal({ capture, proposal, options }: { capture: CaptureView; 
         {!blocked ? (
           <button type="button" onClick={acceptAll} disabled={busy} className="btn-primary">
             {busy ? "Working…" : `Accept ${proposal.operations.length === 1 ? "this" : "all " + proposal.operations.length}`}
+          </button>
+        ) : null}
+        {proposal.recoverable ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              run(
+                () => apiSend<{ outcome: string; details?: Array<{ reason: string }>; reason?: string }>(`/api/proposals/${proposal.id}/reapprove`, "POST"),
+                (r) => {
+                  if (r.outcome === "conflicted") setResult(`Not applied — ${r.details?.map((d) => d.reason).join("; ")}`);
+                  if (r.outcome === "failed") setResult(`Not applied — ${r.reason}`);
+                },
+              )
+            }
+            className="btn-primary"
+          >
+            Re-check and apply
           </button>
         ) : null}
         <button type="button" onClick={rejectAll} disabled={busy} className="btn-ghost">

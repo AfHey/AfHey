@@ -283,29 +283,43 @@ describe("transactional apply", () => {
 });
 
 describe("applying recovery", () => {
-  it("resolves an interrupted apply through the idempotency key", async () => {
-    // Crash before commit: applying, no action.
+  it("resolves interrupted applies past their lease and leaves an active worker alone", async () => {
+    const stale = new Date(Date.now() - 3 * 60 * 1000);
+    // Crash before commit: applying, no action, lease expired.
     const preCommit = await buildProposal(db, {
       origin: "inbox",
       idempotencyKey: nextKey(),
       operations: [{ op: "create", entityType: "note", after: { body: "recovered" } }],
     });
     await approveProposal(db, preCommit.id);
-    await db.proposal.update({ where: { id: preCommit.id }, data: { status: "applying" } });
+    await db.proposal.update({ where: { id: preCommit.id }, data: { status: "applying", updatedAt: stale } });
 
-    // Crash after commit: applying, action exists.
+    // Crash after commit: applying, action exists, lease expired.
     const postCommit = await buildProposal(db, {
       origin: "inbox",
       idempotencyKey: nextKey(),
       operations: [{ op: "create", entityType: "note", after: { body: "committed" } }],
     });
     actionOf(await approvedApply(postCommit.id));
-    await db.proposal.update({ where: { id: postCommit.id }, data: { status: "applying" } });
+    await db.proposal.update({ where: { id: postCommit.id }, data: { status: "applying", updatedAt: stale } });
+
+    // An active worker: applying with a fresh lease. Recovery must not touch it.
+    const active = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "note", after: { body: "in flight" } }],
+    });
+    await approveProposal(db, active.id);
+    await db.proposal.update({ where: { id: active.id }, data: { status: "applying" } });
 
     const outcomes = await recoverApplyingProposals(db);
     const byId = new Map(outcomes.map((o) => [o.proposalId, o.resolvedTo]));
     expect(byId.get(preCommit.id)).toBe("failed");
     expect(byId.get(postCommit.id)).toBe("applied");
+    expect(byId.has(active.id)).toBe(false);
+    expect((await db.proposal.findUniqueOrThrow({ where: { id: active.id } })).status).toBe("applying");
+    // Let the "active" worker finish so later suites see a clean table.
+    await db.proposal.update({ where: { id: active.id }, data: { status: "approved" } });
 
     // The recovery-failed proposal can be re-validated, re-approved, applied.
     const reapproved = await reapproveRecoveredProposal(db, preCommit.id);

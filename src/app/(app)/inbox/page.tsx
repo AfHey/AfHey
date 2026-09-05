@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/page-header";
+import { RECOVERY_NOTE_PREFIX, recoverApplyingProposals } from "@/core/proposals/lifecycle";
 import { getPrisma } from "@/db/client";
 import type { Prisma } from "@/db/generated/client";
 import { Composer } from "./composer";
@@ -26,11 +27,21 @@ function toProposalView(p: ProposalRow): ProposalView {
       confidence: e.confidence,
     })),
   }));
-  return { id: p.id, status: p.status, conflictDetails: p.conflictDetails, operations };
+  return {
+    id: p.id,
+    status: p.status,
+    conflictDetails: p.conflictDetails,
+    failureReason: p.failureReason,
+    recoverable: p.status === "failed" && (p.failureReason ?? "").startsWith(RECOVERY_NOTE_PREFIX),
+    operations,
+  };
 }
 
 export default async function InboxPage() {
   const db = getPrisma();
+  // Operational recovery path (finding 3): reconcile any apply interrupted
+  // past its lease before rendering review state.
+  await recoverApplyingProposals(db);
   const [captures, projects, people, settings] = await Promise.all([
     db.capture.findMany({
       orderBy: { createdAt: "desc" },
