@@ -9,6 +9,7 @@ import type { EntityType, OperationType, ProposalOrigin } from "@/core/domain/en
 import { newUuid } from "@/lib/ids";
 import type { Prisma, PrismaClient, Proposal, ProposalOperation } from "@/db/generated/client";
 import { ProposalStateError, ProposalValidationError, type ConflictDetail } from "./errors";
+import { schedulerPlacementProblems } from "./block-rules";
 import { collectDeleteBlockers, noPlannedDeletes } from "./executors";
 import { deleteManifestSchema, parseOperationPayload } from "./payloads";
 
@@ -43,6 +44,8 @@ export interface ProposalDraft {
    * is silently dropped).
    */
   conflictPolicy?: "throw" | "persist";
+  /** Scheduler only: the user explicitly allowed placing work inside protected windows. */
+  allowProtectedOverride?: boolean;
 }
 
 export type ProposalWithOperations = Proposal & { operations: ProposalOperation[] };
@@ -63,7 +66,7 @@ interface PendingCreate {
   kind?: "area" | "project";
 }
 
-type RefWant = "project" | "area" | "person" | "capture";
+type RefWant = "project" | "area" | "person" | "capture" | "task";
 
 function referencesOf(
   op: OperationType,
@@ -79,6 +82,9 @@ function referencesOf(
   }
   if (entityType === "task" && typeof p.waitingForPersonId === "string") {
     refs.push({ field: "waitingForPersonId", id: p.waitingForPersonId, want: "person" });
+  }
+  if (entityType === "event" && typeof p.taskId === "string") {
+    refs.push({ field: "taskId", id: p.taskId, want: "task" });
   }
   if ((entityType === "task" || entityType === "event") && op === "create" && Array.isArray(p.peopleIds)) {
     for (const id of p.peopleIds) {
@@ -207,7 +213,9 @@ export async function buildProposal(
         const okType =
           ref.want === "person"
             ? pending.entityType === "person"
-            : pending.entityType === "project" && (pendingKind === undefined || pendingKind === ref.want);
+            : ref.want === "task"
+              ? pending.entityType === "task"
+              : pending.entityType === "project" && (pendingKind === undefined || pendingKind === ref.want);
         if (!okType) {
           problems.push(`operation ${index}: ${ref.field} refers to a pending create of the wrong type`);
         }
@@ -219,6 +227,9 @@ export async function buildProposal(
       } else if (ref.want === "capture") {
         const capture = await db.capture.findUnique({ where: { id: ref.id } });
         if (!capture) problems.push(`operation ${index}: ${ref.field} refers to unknown capture ${ref.id}`);
+      } else if (ref.want === "task") {
+        const task = await db.task.findUnique({ where: { id: ref.id } });
+        if (!task) problems.push(`operation ${index}: ${ref.field} refers to unknown task ${ref.id}`);
       } else {
         const project = await db.project.findUnique({ where: { id: ref.id } });
         if (!project || project.kind !== ref.want) {
@@ -241,6 +252,11 @@ export async function buildProposal(
     });
   }
 
+  // Rule §11.2.2 for scheduler output: no block may overlap a fixed Event,
+  // another live block, or a protected window (without an explicit override).
+  if (problems.length === 0 && draft.origin === "scheduler") {
+    problems.push(...(await schedulerPlacementProblems(db, prepared, { allowProtectedOverride: draft.allowProtectedOverride })));
+  }
   if (problems.length > 0) throw new ProposalValidationError(problems);
 
   const conflicted = preconditionConflicts.length > 0;

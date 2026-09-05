@@ -78,6 +78,10 @@ All of `lint`, `typecheck`, `test`, and (once present for the touched area) `tes
 
 Hosting-side scheduling is decided with the hosting decision (spec §19).
 
+## Scheduler worked example
+
+`npx tsx scripts/scheduler-example.ts 2026-09-07 2026-09-05T18:00:00` rebuilds the disposable test database, provisions the user, loads the fictional seed, and prints the `plan_day` Proposal for the date with the given "now" (both in `America/New_York`). It never touches `afhey_dev`.
+
 ## Stack versions (recorded at Step 1, 2026-08-30)
 
 Next.js 16.3.3 · React 19.2.8 · TypeScript 5 · Tailwind CSS 4 · Prisma 7.10.0 · Luxon 3.7.2 · Zod 4.5.4 · Vitest 4.1.11 · Playwright 1.62.1 · tsx 4 (dev-only)

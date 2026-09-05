@@ -89,6 +89,7 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
     const action = await db.$transaction(async (tx) => {
       const opIds = new Set<string>();
       const snapshots: OperationSnapshot[] = [];
+      const context = { excludeEventIds: new Set(proposal.operations.filter((o) => o.entityType === "event").map((o) => o.entityId)) };
 
       for (const op of proposal.operations) {
         for (const dep of op.dependsOnOperationIds) {
@@ -105,12 +106,12 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
 
         switch (op.op) {
           case "create":
-            await executeCreate(tx, op.entityType, op.entityId, payload);
+            await executeCreate(tx, op.entityType, op.entityId, payload, context);
             preRevision = null;
             postRevision = 1;
             break;
           case "update":
-            await executeUpdate(tx, op.entityType, op.entityId, op.expectedRevision!, payload);
+            await executeUpdate(tx, op.entityType, op.entityId, op.expectedRevision!, payload, context);
             postRevision = op.expectedRevision! + 1;
             break;
           case "archive":

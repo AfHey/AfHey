@@ -257,7 +257,7 @@ The user should also be able to:
 - manually reschedule
 - unschedule a task while keeping it in the task list
 
-Provide at least: day view, week view, month view if practical. Day and week views are the highest priority. `[Superseded by decisions.md entry: 2026-08-30 Release boundaries and phase ownership]` Phase 2 (V1) requires day view; week/month views are Phase 5 unless explicitly promoted by a later decision. `[Superseded in part by decisions.md entry: 2026-09-05 Week view promoted to Phase 2]` The week view is promoted to Phase 2; the month view remains Phase 5.
+All-day Events are shown but do not consume scheduler time; whole-day unavailability is a protected window (decisions.md 2026-09-05 "Scheduler engine rules"). Provide at least: day view, week view, month view if practical. Day and week views are the highest priority. `[Superseded by decisions.md entry: 2026-08-30 Release boundaries and phase ownership]` Phase 2 (V1) requires day view; week/month views are Phase 5 unless explicitly promoted by a later decision. `[Superseded in part by decisions.md entry: 2026-09-05 Week view promoted to Phase 2]` The week view is promoted to Phase 2; the month view remains Phase 5.
 
 ### 5.1 Calendar additions (A)
 
@@ -379,7 +379,7 @@ Use deterministic code for: date calculations, calendar conflicts, scheduling, d
 3. **Estimate calibration.** Store actual versus estimated minutes per task and per work type; expose the ratio. Later phases use it to adjust estimates automatically (Section 9.3).
 4. **Scheduler output is always a Proposal** (Section 11), never a direct mutation, so every automatic change is reviewable and, after apply, eligible for conflict-aware undo while its preconditions still hold.
 5. **Composed operations** the scheduler must expose to the tool layer (Section 12.3): `plan_day`, `plan_week`, `lighten_day`, `reschedule_day`, `schedule_task`, `make_room_for`, `postpone_low_priority_tasks`. `find_free_time` is removed from this list `[Superseded by decisions.md entry: 2026-08-30 Cross-review: Phase 1 schema boundary, auth tables, and Event kinds]`: free-time lookup is the read-only primitive `get_free_time` (Section 12.3), which returns data, not a Proposal, so it cannot satisfy the rule that composed operations return Proposals.
-6. **The scheduler is independently testable** with unit tests for conflict detection, splitting, constraint respect, and timezone edge cases (DST transitions included).
+6. **The scheduler is independently testable** with unit tests for conflict detection, splitting, constraint respect, and timezone edge cases (DST transitions included). The implemented rules — ordering, candidate scoring, splitting, the deep-work cap, hard versus soft deadlines, the diff against re-plannable blocks, and the twice-enforced no-overlap rule — are recorded in decisions.md 2026-09-05 "Scheduler engine rules" and live in `core/scheduler/`.
 
 ---
 

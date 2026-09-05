@@ -29,7 +29,20 @@ import type {
   TaskUpdateInput,
 } from "@/core/domain/schemas";
 import type { Prisma } from "@/db/generated/client";
+import { assertBlockPlacementFree } from "./block-rules";
 import { ProposalConflictError, type ConflictDetail } from "./errors";
+
+/** Events touched by the proposal being applied; they never conflict with themselves. */
+export interface ApplyContext {
+  excludeEventIds: Set<string>;
+}
+const NO_CONTEXT: ApplyContext = { excludeEventIds: new Set() };
+
+async function assertBlockTask(tx: Tx, kind: string | undefined, taskId: string | null | undefined): Promise<void> {
+  if (kind !== "block") return;
+  const task = taskId ? await tx.task.findUnique({ where: { id: taskId } }) : null;
+  if (!task) throw new ProposalConflictError([{ reason: "a block must reference an existing task" }]);
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -112,6 +125,7 @@ export async function executeCreate(
   entityType: EntityType,
   entityId: string,
   payload: unknown,
+  context: ApplyContext = NO_CONTEXT,
 ): Promise<void> {
   switch (entityType) {
     case "task": {
@@ -129,6 +143,10 @@ export async function executeCreate(
     case "event": {
       const { peopleIds, ...fields } = payload as EventCreateInput;
       await assertProjectRefIsProject(tx, fields.projectId);
+      await assertBlockTask(tx, fields.kind, fields.taskId);
+      if (fields.kind === "block" && fields.startAt && fields.endAt && fields.blockState !== "cancelled") {
+        await assertBlockPlacementFree(tx, { entityId, start: new Date(fields.startAt), end: new Date(fields.endAt), title: fields.title }, context.excludeEventIds);
+      }
       await tx.event.create({
         data: {
           ...(toEventData(fields) as Prisma.EventUncheckedCreateInput),
@@ -180,6 +198,7 @@ export async function executeUpdate(
   entityId: string,
   expectedRevision: number,
   payload: unknown,
+  context: ApplyContext = NO_CONTEXT,
 ): Promise<void> {
   const current = await lockAndCheck(tx, entityType, entityId, expectedRevision);
   let data: Record<string, unknown>;
@@ -193,8 +212,18 @@ export async function executeUpdate(
     }
     case "event": {
       const converted = toEventData(payload as EventUpdateInput);
-      assertEventShape({ ...current, ...stripUndefined(converted) } as never);
+      const merged = { ...current, ...stripUndefined(converted) } as Record<string, unknown>;
+      assertEventShape(merged as never);
       await assertProjectRefIsProject(tx, (payload as EventUpdateInput).projectId);
+      await assertBlockTask(tx, merged.kind as string, merged.taskId as string | null);
+      const timeChanged = converted.startAt !== undefined || converted.endAt !== undefined || converted.blockState === "planned";
+      if (merged.kind === "block" && timeChanged && (merged.blockState === "planned" || merged.blockState === "in_progress") && merged.startAt && merged.endAt) {
+        await assertBlockPlacementFree(
+          tx,
+          { entityId, start: merged.startAt as Date, end: merged.endAt as Date, title: String(merged.title) },
+          context.excludeEventIds,
+        );
+      }
       data = converted;
       break;
     }

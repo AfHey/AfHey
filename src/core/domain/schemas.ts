@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import {
+  BlockState,
   Confidence,
   DeadlineType,
   EnergyLevel,
@@ -116,12 +117,16 @@ export function taskInputToShape(input: Partial<TaskCreateInput>): TaskShape {
 
 export const eventFieldsSchema = z.object({
   title: trimmed,
-  // Manual/extraction flows never produce blocks in Phase 1; the scheduler
-  // introduces kind=block in Phase 2 (spec cross-review decision).
-  kind: z.enum(EventKind).refine((k) => k !== "block", {
-    message: "block events do not exist in Phase 1",
-  }),
+  // kind=block exists from Phase 2 (scheduler Proposals and direct block
+  // actions); extraction still never proposes blocks (interpretation maps
+  // event kinds from a list without it), and the block invariants below
+  // require task_id and block_state exactly for blocks.
+  kind: z.enum(EventKind),
   scheduleType: z.enum(ScheduleType),
+  /** Blocks only (spec §9.2): the task this block works on. */
+  taskId: z.uuid().nullish(),
+  /** Blocks only: planned | in_progress | completed | missed_unconfirmed | cancelled. */
+  blockState: z.enum(BlockState).nullish(),
   isLocked: z.boolean(),
   startAt: isoInstant.nullish(),
   endAt: isoInstant.nullish(),
@@ -158,14 +163,14 @@ export function eventInputToShape(input: Partial<EventCreateInput>): EventShape 
     title: input.title ?? "untitled",
     kind: input.kind ?? "other",
     scheduleType: input.scheduleType ?? "fixed",
-    blockState: null,
+    blockState: input.blockState ?? null,
     isLocked: input.isLocked ?? false,
     startAt: input.startAt ? new Date(input.startAt) : null,
     endAt: input.endAt ? new Date(input.endAt) : null,
     allDayStartDate: input.allDayStartDate ? isoDateToDb(input.allDayStartDate) : null,
     allDayEndDate: input.allDayEndDate ? isoDateToDb(input.allDayEndDate) : null,
     timezone: input.timezone ?? "America/New_York",
-    taskId: null,
+    taskId: input.taskId ?? null,
   };
 }
 

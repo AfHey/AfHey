@@ -172,6 +172,8 @@ export function toEventData(input: EventUpdateInput) {
     title: input.title,
     kind: input.kind,
     scheduleType: input.scheduleType,
+    taskId: input.taskId,
+    blockState: input.blockState,
     isLocked: input.isLocked,
     startAt: dateOrNull(input.startAt),
     endAt: dateOrNull(input.endAt),
