@@ -14,7 +14,7 @@ jobs:
         env:
           POSTGRES_USER: afhey
           POSTGRES_PASSWORD: afhey
-          POSTGRES_DB: afhey_dev
+          POSTGRES_DB: afhey_test
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U afhey"
@@ -22,7 +22,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql://afhey:afhey@localhost:5432/afhey_dev
+      # Unit/DB suites and e2e all use the test database; nothing else exists in CI.
+      DATABASE_URL: postgresql://afhey:afhey@localhost:5432/afhey_test
       TEST_DATABASE_URL: postgresql://afhey:afhey@localhost:5432/afhey_test
       AFHEY_E2E_PASSWORD: ci-e2e-password-1
       # Deterministic provider only; live extraction never runs in CI.
@@ -34,14 +35,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Create test database
-        run: PGPASSWORD=afhey psql -h localhost -U afhey -d afhey_dev -c "CREATE DATABASE afhey_test"
       - run: npm run lint
       - run: npm run typecheck
-      - name: Migrate and provision the dev database for e2e
-        run: |
-          npx prisma migrate deploy
-          AFHEY_PASSWORD="$AFHEY_E2E_PASSWORD" npm run provision
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e

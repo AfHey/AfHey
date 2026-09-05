@@ -146,6 +146,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: relying on the prompt alone (the first live use showed the model can slip); making the deterministic fake mimic every model failure.
 - Reason: a missing due date on a captured task is a silent data loss the review flow may not catch; the salvage is deterministic parsing, not interpretation, and only fires on phrases it can locate in the source.
 
+## 2026-09-05 End-to-end tests run only against the test database (finding C)
+- Decision: Playwright's global setup rebuilds `afhey_test` (schema, migrations, provisioned user, fictional seed) and the dev server it boots is bound to `TEST_DATABASE_URL`; the config refuses any database not named `*_test` and never reuses an already-running server. CI uses a single test database. The E2E rows that earlier runs had written into `afhey_dev` were removed in one verified transaction (18 captures, 17 proposals, 17 tasks, 9 notes, 27 projects/areas; the one real capture was kept).
+- Rejected: continuing to run e2e against the working database with stamped names; a separate third database.
+- Reason: a test suite must never write into the owner's real data; `afhey_test` already carries the disposable contract.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

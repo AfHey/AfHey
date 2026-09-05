@@ -42,7 +42,7 @@ $PGBIN/createdb -O afhey afhey_dev
 $PGBIN/createdb -O afhey afhey_test
 ```
 
-The `afhey` role has `CREATEDB` so Prisma Migrate can manage its shadow database. `afhey_dev` backs the app (`DATABASE_URL`); `afhey_test` backs the Vitest database suites (`TEST_DATABASE_URL`), which reset it — never point `TEST_DATABASE_URL` at a database with data you care about.
+The `afhey` role has `CREATEDB` so Prisma Migrate can manage its shadow database. `afhey_dev` backs the app you use (`DATABASE_URL`); `afhey_test` backs the Vitest database suites **and** the Playwright e2e server (`TEST_DATABASE_URL`), both of which rebuild it — never point `TEST_DATABASE_URL` at a database with data you care about.
 
 Verify everything with:
 
@@ -59,7 +59,8 @@ To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey
 - `npm run lint` — ESLint
 - `npm run typecheck` — TypeScript, no emit
 - `npm test` — Vitest unit/integration suites
-- `npm run test:e2e` — Playwright end-to-end tests (boots its own dev server on port 3799)
+- `npm run test:e2e` — Playwright end-to-end tests. Boots its own dev server on port 3799 bound **exclusively to `afhey_test`** (rebuilt, provisioned with `AFHEY_E2E_PASSWORD`, and seeded by the global setup); it never touches `afhey_dev`
+- `npm run test:live` — live-provider tests against the pinned OpenAI model (needs `OPENAI_API_KEY`; not part of `npm test` or CI)
 
 All of `lint`, `typecheck`, `test`, and (once present for the touched area) `test:e2e` run before every commit.
 

@@ -19,7 +19,7 @@ test("a reviewed batch survives a completely fresh session", async ({ page, brow
   const card = page.locator("article", { hasText: `E2E exit task ${stamp}` });
   await expect(card.locator("li").getByText(title, { exact: true })).toBeVisible();
   // Deterministic date evidence is shown for the review.
-  await expect(card.getByText(/deadline: “tomorrow”/)).toBeVisible();
+  await expect(card.getByText(/date: “tomorrow”/)).toBeVisible();
   await card.getByRole("button", { name: /^Accept all 2/ }).click();
   await expect(card.getByText("Applied 2 item(s).")).toBeVisible();
 
