@@ -1,7 +1,8 @@
-// AfHey Phase 1 schema — implements exactly the "Phase 1 migration boundary"
-// of docs/product-spec.md §9: 19 tables, no scheduler-constraint tables
-// (Phase 2), no Conversation/Message/TurnReferenceSet or
-// Proposal.conversation_id (Phase 3b).
+// AfHey schema — the "Phase 1 migration boundary" of docs/product-spec.md §9
+// (19 tables) plus the Phase 2 additions (decisions.md 2026-09-05 "Phase 2
+// migration"): the four scheduler-constraint tables owned by UserSettings,
+// Project.domain, and generated full-text search columns. No
+// Conversation/Message/TurnReferenceSet or Proposal.conversation_id (Phase 3b).
 //
 // Rules the DB cannot express declaratively (deadline exactly-one-of,
 // task_kind exactly-when fields, timed vs all-day exclusivity, single active
@@ -140,6 +141,28 @@ enum CaptureProcessingStatus {
   no_ai
 }
 
+// Phase 2 (scheduler constraints; product-spec §7.1, §9.5)
+enum ProjectDomain {
+  work
+  personal
+}
+
+enum AvailabilityKind {
+  general
+  job
+}
+
+enum WindowRecurrence {
+  weekly
+  once
+}
+
+enum JobTimePolicy {
+  unavailable
+  work_related_only
+  any
+}
+
 enum ProposalOrigin {
   inbox
   scheduler
@@ -240,6 +263,12 @@ model UserSettings {
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  // Phase 2 scheduler constraints (product-spec §7.1; decisions.md 2026-09-05).
+  availabilityWindows  AvailabilityWindow[]
+  protectedWindows     ProtectedWindow[]
+  preferredWindows     PreferredWindow[]
+  schedulerPreferences SchedulerPreferences?
+
   @@map("user_settings")
 }
 
@@ -260,6 +289,10 @@ model Project {
   parentId    String?       @map("parent_id") @db.Uuid
   description String?
   importance  Importance?
+  // Phase 2: areas only (CHECK in migration); "work" areas admit job time.
+  domain      ProjectDomain?
+  // Generated full-text column (Phase 2 search); maintained by PostgreSQL.
+  searchVector Unsupported("tsvector")? @map("search_vector")
 
   parent   Project?  @relation("ProjectHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children Project[] @relation("ProjectHierarchy")
@@ -313,6 +346,7 @@ model Task {
   preferredWindowEndTime   DateTime?     @map("preferred_window_end_time") @db.Time(0)
   confidence               Confidence?
   completedAt              DateTime?     @map("completed_at") @db.Timestamptz(3)
+  searchVector             Unsupported("tsvector")? @map("search_vector")
 
   project          Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
   capture          Capture?      @relation(fields: [captureId], references: [id], onDelete: Restrict)
@@ -417,6 +451,7 @@ model Event {
   externalVersion String?    @map("external_version")
   lastSyncedAt    DateTime?  @map("last_synced_at") @db.Timestamptz(3)
   syncStatus      SyncStatus @default(local) @map("sync_status")
+  searchVector    Unsupported("tsvector")? @map("search_vector")
 
   task         Task?         @relation(fields: [taskId], references: [id], onDelete: Restrict)
   project      Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
@@ -460,6 +495,7 @@ model Note {
   title      String?
   projectId  String?   @map("project_id") @db.Uuid
   captureId  String?   @map("capture_id") @db.Uuid
+  searchVector Unsupported("tsvector")? @map("search_vector")
 
   project Project? @relation(fields: [projectId], references: [id], onDelete: Restrict)
   capture Capture? @relation(fields: [captureId], references: [id], onDelete: Restrict)
@@ -645,4 +681,86 @@ model FieldEvidence {
 
   @@index([proposalOperationId])
   @@map("field_evidence")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 scheduler constraints (product-spec §7.1, §9.5; decisions.md
+// 2026-09-05 "Phase 2 migration"). Child rows of UserSettings; versioned
+// inputs to scheduler Proposals. Times are local wall-clock values in
+// UserSettings.current_timezone; weekdays are ISO (1 = Monday … 7 = Sunday).
+// CHECK constraints (start < end, weekday range, recurrence exactly-when,
+// min <= max) are hand-added in the migration and mirrored in code.
+// ---------------------------------------------------------------------------
+
+model AvailabilityWindow {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userSettingsId String           @map("user_settings_id") @db.Uuid
+  revision       Int              @default(1)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  weekday        Int
+  startTime      DateTime         @map("start_time") @db.Time(0)
+  endTime        DateTime         @map("end_time") @db.Time(0)
+  kind           AvailabilityKind @default(general)
+  label          String?
+
+  settings UserSettings @relation(fields: [userSettingsId], references: [id], onDelete: Restrict)
+
+  @@index([userSettingsId, weekday])
+  @@map("availability_window")
+}
+
+model ProtectedWindow {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userSettingsId String           @map("user_settings_id") @db.Uuid
+  revision       Int              @default(1)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  recurrence     WindowRecurrence
+  weekday        Int?
+  onDate         DateTime?        @map("on_date") @db.Date
+  startTime      DateTime         @map("start_time") @db.Time(0)
+  endTime        DateTime         @map("end_time") @db.Time(0)
+  label          String?
+
+  settings UserSettings @relation(fields: [userSettingsId], references: [id], onDelete: Restrict)
+
+  @@index([userSettingsId])
+  @@map("protected_window")
+}
+
+model PreferredWindow {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userSettingsId String    @map("user_settings_id") @db.Uuid
+  revision       Int       @default(1)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  weekday        Int?
+  startTime      DateTime  @map("start_time") @db.Time(0)
+  endTime        DateTime  @map("end_time") @db.Time(0)
+  workType       WorkType? @map("work_type")
+  label          String?
+
+  settings UserSettings @relation(fields: [userSettingsId], references: [id], onDelete: Restrict)
+
+  @@index([userSettingsId])
+  @@map("preferred_window")
+}
+
+model SchedulerPreferences {
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userSettingsId          String        @unique @map("user_settings_id") @db.Uuid
+  revision                Int           @default(1)
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  minBlockMinutes         Int           @default(25) @map("min_block_minutes")
+  maxBlockMinutes         Int           @default(120) @map("max_block_minutes")
+  bufferMinutes           Int           @default(10) @map("buffer_minutes")
+  dailyDeepWorkCapMinutes Int           @default(240) @map("daily_deep_work_cap_minutes")
+  jobTimePolicy           JobTimePolicy @default(work_related_only) @map("job_time_policy")
+  planningHorizonDays     Int           @default(7) @map("planning_horizon_days")
+
+  settings UserSettings @relation(fields: [userSettingsId], references: [id], onDelete: Restrict)
+
+  @@map("scheduler_preferences")
 }

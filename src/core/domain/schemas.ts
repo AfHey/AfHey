@@ -13,6 +13,7 @@ import {
   EntityType,
   EventKind,
   Importance,
+  ProjectDomain,
   ProjectKind,
   ScheduleType,
   TaskBucket,
@@ -197,12 +198,15 @@ export const projectCreateSchema = z.object({
   parentId: z.uuid().nullish(),
   description: optionalText,
   importance: z.enum(Importance).nullish(),
+  /** Areas only (Phase 2): "work" areas admit job time for their tasks. */
+  domain: z.enum(ProjectDomain).nullish(),
 });
 export const projectUpdateSchema = z.object({
   name: trimmed.optional(),
   parentId: z.uuid().nullish(),
   description: optionalText,
   importance: z.enum(Importance).nullish(),
+  domain: z.enum(ProjectDomain).nullish(),
   status: z.enum(["active", "completed"]).optional(),
 });
 

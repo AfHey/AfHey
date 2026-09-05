@@ -5,6 +5,7 @@
  */
 export {
   ApprovalPolicy,
+  AvailabilityKind,
   BlockState,
   CaptureProcessingStatus,
   CaptureSourceType,
@@ -15,7 +16,9 @@ export {
   EntityType,
   EventKind,
   Importance,
+  JobTimePolicy,
   OperationType,
+  ProjectDomain,
   ProjectKind,
   ProjectStatus,
   ProposalOrigin,
@@ -26,5 +29,6 @@ export {
   TaskKind,
   TaskStatus,
   UserPriority,
+  WindowRecurrence,
   WorkType,
 } from "@/db/generated/enums";

@@ -36,10 +36,17 @@ export async function provisionUser(db: PrismaClient, password: string) {
         data: { userId: user.id, kind: "password", secretHash },
       });
     }
-    await tx.userSettings.upsert({
+    const settings = await tx.userSettings.upsert({
       where: { userId: user.id },
       update: {},
       create: { userId: user.id },
+    });
+    // Phase 2: scheduler preferences exist from provisioning with the
+    // product-owner defaults (decisions.md 2026-09-05).
+    await tx.schedulerPreferences.upsert({
+      where: { userSettingsId: settings.id },
+      update: {},
+      create: { userSettingsId: settings.id },
     });
     return tx.user.findUniqueOrThrow({ where: { id: user.id } });
   });

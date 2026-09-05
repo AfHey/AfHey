@@ -37,19 +37,28 @@ const ID = {
   eventTileDelivery: "f0000000-0000-4000-8000-000000000003",
   noteBacksplash: "90000000-0000-4000-8000-000000000001",
   noteRetryConstraints: "90000000-0000-4000-8000-000000000002",
+  // Phase 2 (scheduler inputs and tasks with estimates).
+  taskMonitoringNotes: "e0000000-0000-4000-8000-000000000006",
+  taskBudgetUpdate: "e0000000-0000-4000-8000-000000000007",
+  availabilityWeekday: "a2000000-0000-4000-8000-00000000000", // + weekday digit
+  availabilitySaturday: "a2000000-0000-4000-8000-000000000016",
+  jobWeekday: "a2000000-0000-4000-8000-00000000002", // + weekday digit
+  protectedSunday: "a3000000-0000-4000-8000-000000000001",
+  preferredDeep: "a4000000-0000-4000-8000-000000000001",
+  preferredStudy: "a4000000-0000-4000-8000-000000000002",
 } as const;
 
 async function main() {
   // Areas and projects (one area level, spec §6).
   await db.project.upsert({
     where: { id: ID.areaWork },
-    update: {},
-    create: { id: ID.areaWork, kind: "area", name: "Work" },
+    update: { domain: "work" },
+    create: { id: ID.areaWork, kind: "area", name: "Work", domain: "work" },
   });
   await db.project.upsert({
     where: { id: ID.areaPersonal },
-    update: {},
-    create: { id: ID.areaPersonal, kind: "area", name: "Personal" },
+    update: { domain: "personal" },
+    create: { id: ID.areaPersonal, kind: "area", name: "Personal", domain: "personal" },
   });
   await db.project.upsert({
     where: { id: ID.projectPipeline },
@@ -186,6 +195,36 @@ async function main() {
       isSchedulable: false,
     },
   });
+  // Phase 2: two more schedulable tasks so plan_day has something to place.
+  await db.task.upsert({
+    where: { id: ID.taskMonitoringNotes },
+    update: {},
+    create: {
+      id: ID.taskMonitoringNotes,
+      title: "Review ingestion monitoring notes",
+      projectId: ID.projectPipeline,
+      deadlineDate: new Date("2026-09-10"),
+      deadlineType: "soft",
+      estimatedDurationMinutes: 60,
+      remainingEstimateMinutes: 60,
+      workType: "study",
+    },
+  });
+  await db.task.upsert({
+    where: { id: ID.taskBudgetUpdate },
+    update: {},
+    create: {
+      id: ID.taskBudgetUpdate,
+      title: "Write renovation budget update",
+      projectId: ID.projectRenovation,
+      deadlineDate: new Date("2026-09-11"),
+      deadlineType: "hard",
+      estimatedDurationMinutes: 150,
+      remainingEstimateMinutes: 150,
+      isSplittable: true,
+      workType: "deep",
+    },
+  });
   await db.task.upsert({
     where: { id: ID.taskVenue },
     update: {},
@@ -265,6 +304,52 @@ async function main() {
     },
   });
 
+  // Phase 2 scheduler constraints — only when the single user is provisioned
+  // (UserSettings exists); wholly fictional evening/weekend availability.
+  const settings = await db.userSettings.findFirst();
+  if (settings) {
+    await db.schedulerPreferences.upsert({
+      where: { userSettingsId: settings.id },
+      update: {},
+      create: { userSettingsId: settings.id },
+    });
+    const time = (hhmm: string) => new Date(`1970-01-01T${hhmm}:00.000Z`);
+    for (let weekday = 1; weekday <= 5; weekday++) {
+      await db.availabilityWindow.upsert({
+        where: { id: `${ID.availabilityWeekday}${weekday}` },
+        update: {},
+        create: { id: `${ID.availabilityWeekday}${weekday}`, userSettingsId: settings.id, weekday, startTime: time("17:30"), endTime: time("21:30"), kind: "general", label: "Evenings" },
+      });
+      await db.availabilityWindow.upsert({
+        where: { id: `${ID.jobWeekday}${weekday}` },
+        update: {},
+        create: { id: `${ID.jobWeekday}${weekday}`, userSettingsId: settings.id, weekday, startTime: time("08:00"), endTime: time("16:00"), kind: "job", label: "Job hours" },
+      });
+    }
+    await db.availabilityWindow.upsert({
+      where: { id: ID.availabilitySaturday },
+      update: {},
+      create: { id: ID.availabilitySaturday, userSettingsId: settings.id, weekday: 6, startTime: time("09:00"), endTime: time("13:00"), kind: "general", label: "Saturday morning" },
+    });
+    await db.protectedWindow.upsert({
+      where: { id: ID.protectedSunday },
+      update: {},
+      create: { id: ID.protectedSunday, userSettingsId: settings.id, recurrence: "weekly", weekday: 7, startTime: time("08:00"), endTime: time("20:00"), label: "Family day" },
+    });
+    await db.preferredWindow.upsert({
+      where: { id: ID.preferredDeep },
+      update: {},
+      create: { id: ID.preferredDeep, userSettingsId: settings.id, weekday: null, startTime: time("18:00"), endTime: time("20:00"), workType: "deep", label: "Deep work early evening" },
+    });
+    await db.preferredWindow.upsert({
+      where: { id: ID.preferredStudy },
+      update: {},
+      create: { id: ID.preferredStudy, userSettingsId: settings.id, weekday: null, startTime: time("20:00"), endTime: time("22:00"), workType: "study", label: "Study late evening" },
+    });
+  } else {
+    console.log("No UserSettings row yet: scheduler constraints not seeded (run `npm run provision` first).");
+  }
+
   const counts = {
     projects: await db.project.count(),
     people: await db.person.count(),
@@ -272,6 +357,7 @@ async function main() {
     events: await db.event.count(),
     notes: await db.note.count(),
     glossary: await db.glossaryEntry.count(),
+    availabilityWindows: await db.availabilityWindow.count(),
   };
   console.log("Seed complete:", counts);
 }

@@ -232,6 +232,15 @@ export function projectParentViolations(
   return v;
 }
 
+/** Phase 2: `domain` is set on areas only; projects inherit their area's domain. */
+export function projectDomainViolations(kind: ProjectKind, domain: string | null | undefined): string[] {
+  return domain != null && kind !== "area" ? ["domain can be set on areas only; projects inherit it"] : [];
+}
+
+export function assertProjectDomain(kind: ProjectKind, domain: string | null | undefined): void {
+  assertNone("Project", projectDomainViolations(kind, domain));
+}
+
 export function assertProjectParent(
   kind: ProjectKind,
   parent: { id: string; kind: ProjectKind } | null,

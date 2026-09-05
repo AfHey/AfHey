@@ -27,7 +27,7 @@ async function expectViolation(sql: string, constraint: string) {
 }
 
 describe("Phase 1 migration boundary", () => {
-  it("creates exactly the 19 boundary tables", async () => {
+  it("creates the 19 Phase 1 boundary tables plus the four Phase 2 scheduler tables", async () => {
     const rows = await db.$queryRaw<Array<{ table_name: string }>>`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -39,6 +39,7 @@ describe("Phase 1 migration boundary", () => {
       [
         "action_log",
         "app_user",
+        "availability_window",
         "capture",
         "credential",
         "event",
@@ -48,9 +49,12 @@ describe("Phase 1 migration boundary", () => {
         "note",
         "person",
         "person_alias",
+        "preferred_window",
         "project",
         "proposal",
         "proposal_operation",
+        "protected_window",
+        "scheduler_preferences",
         "session",
         "task",
         "task_person",

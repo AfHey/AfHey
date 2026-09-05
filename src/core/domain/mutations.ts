@@ -8,6 +8,7 @@
 import type { PrismaClient, Prisma } from "@/db/generated/client";
 import {
   assertEventShape,
+  assertProjectDomain,
   assertProjectParent,
   assertTaskShape,
   DomainInvariantError,
@@ -274,6 +275,7 @@ export async function createProjectDirect(db: PrismaClient, input: ProjectCreate
       ? await tx.project.findUniqueOrThrow({ where: { id: input.parentId } })
       : null;
     assertProjectParent(input.kind, parent);
+    assertProjectDomain(input.kind, input.domain);
     return tx.project.create({ data: input });
   });
 }
@@ -286,6 +288,7 @@ export async function updateProjectDirect(
     parentId?: string | null;
     description?: string | null;
     importance?: "low" | "medium" | "high" | null;
+    domain?: "work" | "personal" | null;
     status?: "active" | "completed";
   },
 ) {
@@ -297,6 +300,7 @@ export async function updateProjectDirect(
       ? await tx.project.findUniqueOrThrow({ where: { id: nextParentId } })
       : null;
     assertProjectParent(current.kind, parent, id);
+    assertProjectDomain(current.kind, input.domain === undefined ? current.domain : input.domain);
     return guardedUpdate("Project", id, current.revision, () =>
       tx.project.update({ where: { id, revision: current.revision }, data: bumped(input) }),
     );
