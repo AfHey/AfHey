@@ -11,7 +11,10 @@ test("a reviewed batch survives a completely fresh session", async ({ page, brow
   await page.goto("/inbox");
   await page.getByLabel("Capture").fill(`${title}\nnote: E2E exit note ${stamp}`);
   await page.getByRole("button", { name: "Capture" }).click();
-  await page.getByRole("button", { name: "Interpret with AI" }).click();
+  await page
+    .getByRole("region", { name: "Redaction preview" })
+    .getByRole("button", { name: "Interpret with AI" })
+    .click();
 
   const card = page.locator("article", { hasText: `E2E exit task ${stamp}` });
   await expect(card.locator("li").getByText(title, { exact: true })).toBeVisible();
@@ -43,8 +46,9 @@ test("the Inbox review works on a phone-sized screen", async ({ page }) => {
   await page.goto("/inbox");
   await page.getByLabel("Capture").fill(`E2E mobile ${stamp}`);
   await page.getByRole("button", { name: "Capture" }).click();
-  await expect(page.getByRole("region", { name: "Redaction preview" })).toBeVisible();
-  await page.getByRole("button", { name: "Interpret with AI" }).click();
+  const preview = page.getByRole("region", { name: "Redaction preview" });
+  await expect(preview).toBeVisible();
+  await preview.getByRole("button", { name: "Interpret with AI" }).click();
   const card = page.locator("article", { hasText: `E2E mobile ${stamp}` });
   await card.getByRole("button", { name: /^Accept this/ }).click();
   await expect(card.getByText("Applied 1 item(s).")).toBeVisible();

@@ -11,9 +11,10 @@ test("captures, previews, interprets, accepts, and undoes a batch", async ({ pag
   await page.getByLabel("Capture").fill(`${title}\nnote: E2E receipts ${stamp}`);
   await page.getByRole("button", { name: "Capture" }).click();
 
-  await expect(page.getByRole("region", { name: "Redaction preview" })).toBeVisible();
-  await expect(page.getByLabel("Text to send")).toHaveValue(new RegExp(`E2E water the plants ${stamp}`));
-  await page.getByRole("button", { name: "Interpret with AI" }).click();
+  const preview = page.getByRole("region", { name: "Redaction preview" });
+  await expect(preview).toBeVisible();
+  await expect(preview.getByLabel("Text to send")).toHaveValue(new RegExp(`E2E water the plants ${stamp}`));
+  await preview.getByRole("button", { name: "Interpret with AI" }).click();
 
   const card = page.locator("article", { hasText: `E2E water the plants ${stamp}` });
   await expect(card.locator("li").getByText(title, { exact: true })).toBeVisible();
