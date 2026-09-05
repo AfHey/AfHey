@@ -111,7 +111,8 @@ describe("interpretExtraction", () => {
     });
     expect(rows.map((r) => r.literalText)).toEqual(["Orchid Grant", "draft the budget", "tomorrow"]);
     const temporalRow = rows.find((r) => r.fieldPath === "deadline")!;
-    expect(temporalRow.resolverMeta).toMatchObject({ literal: "tomorrow", relation: "on" });
+    expect(temporalRow.resolverMeta).toMatchObject({ relation: "on", resolution: { kind: "date", date: "2026-09-02" } });
+    expect(JSON.stringify(temporalRow.resolverMeta)).not.toContain("tomorrow");
 
     const refreshed = await db.capture.findUniqueOrThrow({ where: { id: capture.id } });
     expect(refreshed.processingStatus).toBe("proposed");

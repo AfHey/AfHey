@@ -4,7 +4,10 @@
  * rows and links persist; never-resolved captures are discarded 30 days
  * after creation with their proposals expired; the job is idempotent.
  */
+import { DateTime } from "luxon";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createCapture } from "@/core/captures/service";
+import { interpretExtraction } from "@/core/interpretation/pipeline";
 import type { PrismaClient } from "@/db/generated/client";
 import { runCaptureExpiry } from "@/jobs/expire-capture-text";
 import { resetTestDatabase } from "../helpers/test-db";
@@ -103,6 +106,62 @@ describe("runCaptureExpiry", () => {
     expect(discarded.rawText).toBeNull();
     expect(discarded.rawDeleteAfter).not.toBeNull();
     expect((await db.capture.findUniqueOrThrow({ where: { id: fresh.id } })).rawText).toBe("fresh");
+  });
+
+  it("leaves no source wording in any persisted text or JSON field after expiry (finding 8)", async () => {
+    // A sentinel appears only in the capture text, as an unresolvable temporal
+    // phrase and an unresolved reference; nothing derived may keep it.
+    const sentinel = "zqxvsentinel";
+    const payload = `renew the permit ${sentinel}`;
+    const start = payload.indexOf(sentinel);
+    const capture = await createCapture(db, { text: payload, sourceType: "typed" });
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      extraction: {
+        schema_version: "1",
+        prompt_version: "test",
+        items: [
+          {
+            item_ref: "item-1",
+            depends_on_item_refs: [],
+            entity_type: "task",
+            fields: { title: "renew the permit" },
+            temporal_expressions: [
+              { field: "deadline", literal: sentinel, relation: "on", anchor_entity_id: null, evidence: { start, end: start + sentinel.length }, confidence: "medium" },
+            ],
+            entity_references: [
+              { field: "people", candidate_ids: [], unresolved_literal: sentinel, evidence: { start, end: start + sentinel.length }, confidence: "needs_confirmation" },
+            ],
+            field_evidence: [{ field: "title", evidence: { start: 0, end: 16 }, confidence: "high" }],
+          },
+        ],
+      },
+      now: DateTime.fromISO("2026-09-01T09:00:00", { zone: "America/New_York" }),
+      idempotencyKey: `sentinel-${sentinel}`,
+    });
+    expect(outcome.proposal).not.toBeNull();
+    await db.capture.update({ where: { id: capture.id }, data: { rawDeleteAfter: new Date(now.getTime() - 1000) } });
+    await runCaptureExpiry(db, now);
+
+    const like = `%${sentinel}%`;
+    const [hits] = await db.$queryRawUnsafe<Array<{ total: number }>>(
+      `SELECT (
+         (SELECT count(*) FROM capture WHERE raw_text ILIKE $1 OR redacted_text ILIKE $1)
+       + (SELECT count(*) FROM field_evidence WHERE literal_text ILIKE $1 OR resolver_meta::text ILIKE $1)
+       + (SELECT count(*) FROM proposal_operation WHERE reason ILIKE $1 OR before::text ILIKE $1)
+       + (SELECT count(*) FROM proposal WHERE conflict_details::text ILIKE $1 OR failure_reason ILIKE $1)
+       + (SELECT count(*) FROM action_log WHERE operations::text ILIKE $1)
+       )::int AS total`,
+      like,
+    );
+    expect(hits.total).toBe(0);
+    // The evidence row itself survives in shape.
+    const rows = await db.fieldEvidence.findMany({
+      where: { proposalOperationId: { in: outcome.proposal!.operations.map((o) => o.operationId) } },
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.literalText === null)).toBe(true);
   });
 
   it("is idempotent", async () => {

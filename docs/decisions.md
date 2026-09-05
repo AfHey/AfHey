@@ -151,6 +151,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: continuing to run e2e against the working database with stamped names; a separate third database.
 - Reason: a test suite must never write into the owner's real data; `afhey_test` already carries the disposable contract.
 
+## 2026-09-05 Source wording never outlives capture retention (finding 8)
+- Decision: everything derived from a capture that must persist past the 30-day window is text-free. FieldEvidence.resolver_meta holds only relation, resolution kind/values, and candidate ids; resolver reasons and pipeline warnings (which ride on operation reasons and into ActionLog snapshots) describe the problem without quoting the phrase; the evidence chip — backed by the expiring `literal_text` — is where the phrase is shown. A one-off, product-owner-approved data migration (`20260905030636_retention_scrub`) removed the copies earlier code had written. Extracted domain records (titles, bodies) are not capture text and are unaffected.
+- Rejected: extending the expiry job to scrub free-text reasons and metadata forever (fragile, and audit records must not be edited); leaving existing copies in place.
+- Reason: the guard is a last-resort detector, so any fragment that slipped through must fall under the same retention as the raw text.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

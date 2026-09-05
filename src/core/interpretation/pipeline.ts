@@ -166,6 +166,20 @@ function fieldEvidenceIsMeaningful(field: string, after: Record<string, unknown>
   });
 }
 
+/** Strips any source-derived wording from a resolution before persistence. */
+function textFreeResolution(resolution: TemporalResolution): Record<string, unknown> {
+  switch (resolution.kind) {
+    case "date":
+      return { kind: "date", date: resolution.date, confidence: resolution.confidence };
+    case "instant":
+      return { kind: "instant", instant: resolution.instant, timezone: resolution.timezone, confidence: resolution.confidence };
+    case "needs_confirmation":
+      return { kind: "needs_confirmation", suggestions: resolution.suggestions };
+    case "unresolved":
+      return { kind: "unresolved" };
+  }
+}
+
 function evidenceInBounds(item: ExtractionItem, length: number): boolean {
   const spans = [
     ...item.field_evidence.map((f) => f.evidence),
@@ -391,12 +405,14 @@ export async function interpretExtraction(
             dueDate = r.local.slice(0, 10);
             confidences.push(r.confidence);
           } else {
+            // Warnings ride on audit-bound operation reasons, so they carry
+            // no source wording (finding 8); the evidence chip shows the phrase.
             warnings.push({
               itemRef: item.item_ref,
               message:
                 r.kind === "needs_confirmation"
-                  ? `deadline "${deadline.literal}": ${r.reason}; suggestions: ${r.suggestions.join(", ")}`
-                  : `deadline "${deadline.literal}" could not be resolved; set it at review`,
+                  ? `the deadline phrase is ambiguous (${r.reason}); suggestions: ${r.suggestions.join(", ")}`
+                  : "the deadline phrase could not be resolved; set it at review",
               severity: "needs_confirmation",
             });
             confidences.push("needs_confirmation");
@@ -493,7 +509,7 @@ export async function interpretExtraction(
             itemRef: item.item_ref,
             message:
               s?.kind === "needs_confirmation"
-                ? `event time "${start!.literal}": ${s.reason} — kept as a task; suggestions: ${s.suggestions.join(", ")}`
+                ? `the event time is ambiguous (${s.reason}) — kept as a task; suggestions: ${s.suggestions.join(", ")}`
                 : "event had no resolvable time; kept as a task",
             severity: "needs_confirmation",
           });
@@ -691,6 +707,8 @@ export async function interpretExtraction(
         confidence: fe.confidence,
       });
     }
+    // Resolver metadata is structured and text-free (finding 8): the source
+    // phrase lives only in literalText, which the retention job clears.
     for (const t of p.item.temporal_expressions) {
       const resolution = resolveTemporal(t.literal, t.relation, { now: input.now });
       evidenceRows.push({
@@ -700,7 +718,7 @@ export async function interpretExtraction(
         endOffset: t.evidence.end,
         literalText: slice(t.evidence.start, t.evidence.end),
         confidence: t.confidence,
-        resolverMeta: JSON.parse(JSON.stringify({ literal: t.literal, relation: t.relation, resolution })),
+        resolverMeta: JSON.parse(JSON.stringify({ relation: t.relation, resolution: textFreeResolution(resolution) })),
       });
     }
     for (const r of p.item.entity_references) {
@@ -711,7 +729,7 @@ export async function interpretExtraction(
         endOffset: r.evidence.end,
         literalText: slice(r.evidence.start, r.evidence.end),
         confidence: r.confidence,
-        resolverMeta: { candidateIds: r.candidate_ids, unresolvedLiteral: r.unresolved_literal },
+        resolverMeta: { candidateIds: r.candidate_ids, unresolved: r.unresolved_literal !== null },
       });
     }
   }

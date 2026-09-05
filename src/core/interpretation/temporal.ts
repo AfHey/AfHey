@@ -243,7 +243,7 @@ function parseDay(lower: string, now: DateTime): DayPart | null {
         date: nextWeek,
         confidence: "needs_confirmation",
         alternatives: [plain, nextWeek],
-        reason: `"next ${weekday[2]}" could mean either upcoming ${weekday[2]}`,
+        reason: "\"next\" plus a weekday could mean either of two dates",
       };
     }
     if (today.weekday === target) {
@@ -251,7 +251,7 @@ function parseDay(lower: string, now: DateTime): DayPart | null {
         date: today,
         confidence: "needs_confirmation",
         alternatives: [today, today.plus({ weeks: 1 })],
-        reason: `today is ${weekday[2]}; this could mean today or next week`,
+        reason: "the weekday named is today; it could mean today or next week",
       };
     }
     return { date: plain, confidence: "high" };
@@ -417,8 +417,10 @@ export function resolveTemporal(
   const day = parseDay(lower, now);
   const time = parseTime(lower);
 
+  // Reasons are persisted in resolver metadata and audit reasons, so they
+  // never quote the source phrase (finding 8).
   if (!day && !time) {
-    return { kind: "unresolved", reason: `could not interpret "${literal}"` };
+    return { kind: "unresolved", reason: "the phrase is not a recognizable date or time" };
   }
 
   if (day && day.confidence === "needs_confirmation") {
@@ -448,7 +450,7 @@ export function resolveTemporal(
   if (time.confidence === "needs_confirmation" && time.alternatives) {
     return {
       kind: "needs_confirmation",
-      reason: `"${literal}" has no am/pm`,
+      reason: "the hour has no am/pm",
       suggestions: time.alternatives.map((alt) =>
         baseDay.set({ hour: alt.hour, minute: alt.minute }).toISO()!,
       ),
