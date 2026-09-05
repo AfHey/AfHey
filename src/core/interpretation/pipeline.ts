@@ -807,14 +807,90 @@ export async function interpretExtraction(
     p.draft.reason = [p.draft.reason, ...notes].filter(Boolean).join(" · ");
   }
 
-  let proposal: ProposalWithOperations;
+  class CaptureResolvedElsewhere extends Error {}
+
+  // FieldEvidence rows: offsets index into the transmitted payload text.
+  // Field evidence is kept only for fields that actually populated the
+  // proposed item (finding B): evidence for absent or default-valued fields
+  // is noise that misleads review.
+  const evidenceRowsFor = (built: ProposalWithOperations): Prisma.FieldEvidenceCreateManyInput[] => {
+    const rows: Prisma.FieldEvidenceCreateManyInput[] = [];
+    for (const [index, p] of preparedList.entries()) {
+      const operation = built.operations[index];
+      const slice = (start: number, end: number) => input.payloadText.slice(start, end);
+      const after = (p.draft.after ?? {}) as Record<string, unknown>;
+      for (const fe of p.item.field_evidence) {
+        if (!fieldEvidenceIsMeaningful(fe.field, after)) continue;
+        rows.push({
+          proposalOperationId: operation.operationId,
+          fieldPath: fe.field,
+          startOffset: fe.evidence.start,
+          endOffset: fe.evidence.end,
+          literalText: slice(fe.evidence.start, fe.evidence.end),
+          confidence: fe.confidence,
+        });
+      }
+      // Resolver metadata is structured and text-free (finding 8): the source
+      // phrase lives only in literalText, which the retention job clears.
+      for (const t of p.item.temporal_expressions) {
+        const resolution = resolveTemporal(t.literal, t.relation, { now: input.now });
+        rows.push({
+          proposalOperationId: operation.operationId,
+          fieldPath: t.field,
+          startOffset: t.evidence.start,
+          endOffset: t.evidence.end,
+          literalText: slice(t.evidence.start, t.evidence.end),
+          confidence: t.confidence,
+          resolverMeta: JSON.parse(JSON.stringify({ relation: t.relation, resolution: textFreeResolution(resolution) })),
+        });
+      }
+      for (const r of p.item.entity_references) {
+        rows.push({
+          proposalOperationId: operation.operationId,
+          fieldPath: r.field,
+          startOffset: r.evidence.start,
+          endOffset: r.evidence.end,
+          literalText: slice(r.evidence.start, r.evidence.end),
+          confidence: r.confidence,
+          resolverMeta: { candidateIds: r.candidate_ids, unresolved: r.unresolved_literal !== null },
+        });
+      }
+    }
+    return rows;
+  };
+
+  // Proposal, evidence, and the capture transition commit together
+  // (finding 7). The transition is conditional on still holding the claim
+  // (finding 2): losing it means another action resolved the capture
+  // meanwhile, so the whole review rolls back rather than staying applicable.
   try {
-    proposal = await buildProposal(db, {
-      origin: "inbox",
-      idempotencyKey: input.idempotencyKey,
-      captureId: input.captureId,
-      operations: preparedList.map((p) => p.draft),
+    const proposal = await db.$transaction(async (tx) => {
+      const built = await buildProposal(tx, {
+        origin: "inbox",
+        idempotencyKey: input.idempotencyKey,
+        captureId: input.captureId,
+        operations: preparedList.map((p) => p.draft),
+      });
+      const evidenceRows = evidenceRowsFor(built);
+      if (evidenceRows.length > 0) await tx.fieldEvidence.createMany({ data: evidenceRows });
+      const transitioned = await tx.capture.updateMany({
+        where: {
+          id: input.captureId,
+          processingStatus: { in: ["received", "redacted"] },
+          ...(input.claimKey ? { processingClaimKey: input.claimKey } : {}),
+        },
+        data: {
+          processingStatus: "proposed",
+          redactedText: input.payloadText,
+          processingClaimKey: null,
+          processingClaimedAt: null,
+          revision: { increment: 1 },
+        },
+      });
+      if (transitioned.count !== 1) throw new CaptureResolvedElsewhere();
+      return built;
     });
+    return { proposal, warnings, duplicates, skipped };
   } catch (error) {
     if (error instanceof ProposalValidationError) {
       return {
@@ -827,81 +903,9 @@ export async function interpretExtraction(
         skipped,
       };
     }
+    if (error instanceof CaptureResolvedElsewhere) {
+      return { proposal: null, warnings, duplicates, skipped, superseded: true };
+    }
     throw error;
   }
-
-  // FieldEvidence rows: offsets index into the transmitted payload text.
-  // Field evidence is kept only for fields that actually populated the
-  // proposed item (finding B): evidence for absent or default-valued fields
-  // is noise that misleads review.
-  const evidenceRows: Prisma.FieldEvidenceCreateManyInput[] = [];
-  for (const [index, p] of preparedList.entries()) {
-    const operation = proposal.operations[index];
-    const slice = (start: number, end: number) => input.payloadText.slice(start, end);
-    const after = (p.draft.after ?? {}) as Record<string, unknown>;
-    for (const fe of p.item.field_evidence) {
-      if (!fieldEvidenceIsMeaningful(fe.field, after)) continue;
-      evidenceRows.push({
-        proposalOperationId: operation.operationId,
-        fieldPath: fe.field,
-        startOffset: fe.evidence.start,
-        endOffset: fe.evidence.end,
-        literalText: slice(fe.evidence.start, fe.evidence.end),
-        confidence: fe.confidence,
-      });
-    }
-    // Resolver metadata is structured and text-free (finding 8): the source
-    // phrase lives only in literalText, which the retention job clears.
-    for (const t of p.item.temporal_expressions) {
-      const resolution = resolveTemporal(t.literal, t.relation, { now: input.now });
-      evidenceRows.push({
-        proposalOperationId: operation.operationId,
-        fieldPath: t.field,
-        startOffset: t.evidence.start,
-        endOffset: t.evidence.end,
-        literalText: slice(t.evidence.start, t.evidence.end),
-        confidence: t.confidence,
-        resolverMeta: JSON.parse(JSON.stringify({ relation: t.relation, resolution: textFreeResolution(resolution) })),
-      });
-    }
-    for (const r of p.item.entity_references) {
-      evidenceRows.push({
-        proposalOperationId: operation.operationId,
-        fieldPath: r.field,
-        startOffset: r.evidence.start,
-        endOffset: r.evidence.end,
-        literalText: slice(r.evidence.start, r.evidence.end),
-        confidence: r.confidence,
-        resolverMeta: { candidateIds: r.candidate_ids, unresolved: r.unresolved_literal !== null },
-      });
-    }
-  }
-  if (evidenceRows.length > 0) await db.fieldEvidence.createMany({ data: evidenceRows });
-
-  // Capture transition is conditional on still holding the claim (finding 2);
-  // losing it means another action resolved the capture meanwhile, so the
-  // just-built proposal is voided rather than left applicable.
-  const transitioned = await db.capture.updateMany({
-    where: {
-      id: input.captureId,
-      processingStatus: { in: ["received", "redacted"] },
-      ...(input.claimKey ? { processingClaimKey: input.claimKey } : {}),
-    },
-    data: {
-      processingStatus: "proposed",
-      redactedText: input.payloadText,
-      processingClaimKey: null,
-      processingClaimedAt: null,
-      revision: { increment: 1 },
-    },
-  });
-  if (transitioned.count !== 1) {
-    await db.proposal.update({
-      where: { id: proposal.id },
-      data: { status: "superseded", revision: { increment: 1 } },
-    });
-    return { proposal: null, warnings, duplicates, skipped, superseded: true };
-  }
-
-  return { proposal, warnings, duplicates, skipped };
 }

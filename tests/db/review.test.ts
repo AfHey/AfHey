@@ -140,6 +140,53 @@ describe("reviseProposal on linked batches (finding 5)", () => {
     expect(carried.map((r) => r.fieldPath)).toEqual(["deadline"]);
   });
 
+  it("a failure while carrying evidence leaves the original review untouched (finding 7)", async () => {
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "task", after: { title: "atomic" } }],
+    });
+    const op = proposal.operations[0];
+    await db.fieldEvidence.create({
+      data: { proposalOperationId: op.operationId, fieldPath: "title", startOffset: 0, endOffset: 6, literalText: "atomic", confidence: "high" },
+    });
+    // Inject a failure into the evidence copy inside the revision transaction.
+    const wrapDelegate = (delegate: object) =>
+      new Proxy(delegate, {
+        get(d, m) {
+          if (m === "createMany") return () => Promise.reject(new Error("injected failure"));
+          const v = Reflect.get(d, m);
+          return typeof v === "function" ? v.bind(d) : v;
+        },
+      });
+    const failing = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === "$transaction") {
+          return (fn: (tx: unknown) => Promise<unknown>) =>
+            target.$transaction((tx) =>
+              fn(
+                new Proxy(tx, {
+                  get(t, p) {
+                    const v = Reflect.get(t, p);
+                    return p === "fieldEvidence" ? wrapDelegate(v as object) : v;
+                  },
+                }),
+              ),
+            );
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as PrismaClient;
+
+    await expect(
+      reviseProposal(failing, proposal.id, [
+        { sourceOperationId: op.operationId, entityType: "task", after: { ...(op.after as object), notes: "changed" }, dependsOn: [] },
+      ]),
+    ).rejects.toThrow(/injected failure/);
+    expect((await db.proposal.findUniqueOrThrow({ where: { id: proposal.id } })).status).toBe("pending");
+    expect(await db.proposal.count({ where: { supersedesProposalId: proposal.id } })).toBe(0);
+  });
+
   it("orders items by reference even when the client sends dependents first", async () => {
     const proposal = await linkedBatch();
     const [projectOp, personOp, taskOp] = proposal.operations;

@@ -47,6 +47,13 @@ export interface ProposalDraft {
 
 export type ProposalWithOperations = Proposal & { operations: ProposalOperation[] };
 
+/** A client or an open transaction; callers compose larger atomic units (finding 7). */
+export type DbLike = PrismaClient | Prisma.TransactionClient;
+
+function runInTx<T>(db: DbLike, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return "$transaction" in db ? (db as PrismaClient).$transaction(fn) : fn(db as Prisma.TransactionClient);
+}
+
 function toJson<T>(value: T): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
@@ -85,7 +92,7 @@ function referencesOf(
 }
 
 export async function buildProposal(
-  db: PrismaClient,
+  db: DbLike,
   draft: ProposalDraft,
 ): Promise<ProposalWithOperations> {
   const existing = await db.proposal.findUnique({
@@ -243,7 +250,7 @@ export async function buildProposal(
 
   const idBySequence = new Map(prepared.map((p) => [p.sequence, p.operationId]));
 
-  return db.$transaction(async (tx) => {
+  return runInTx(db, async (tx) => {
     if (draft.supersedesProposalId) {
       const updated = await tx.proposal.updateMany({
         where: {

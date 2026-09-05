@@ -16,6 +16,7 @@ import { interpretExtraction } from "@/core/interpretation/pipeline";
 import { applyProposal } from "@/core/proposals/apply";
 import { approveProposal } from "@/core/proposals/lifecycle";
 import type { PrismaClient } from "@/db/generated/client";
+import { withFailingMethod } from "../helpers/failing-db";
 import { resetTestDatabase } from "../helpers/test-db";
 
 let db: PrismaClient;
@@ -473,6 +474,38 @@ describe("interpretExtraction", () => {
       ["2026-09-04", "soft"],
       ["2026-10-01", "hard"],
     ]);
+  });
+
+  it("persists nothing when finalization fails part-way (finding 7)", async () => {
+    const payload = "renew the permit tomorrow";
+    const capture = await newCapture(payload);
+    // The evidence insert fails after the proposal was built inside the same
+    // transaction; nothing may survive.
+    const failing = withFailingMethod(db, "fieldEvidence", "createMany");
+    await expect(
+      interpretExtraction(failing, {
+        captureId: capture.id,
+        payloadText: payload,
+        mentions: [],
+        extraction: result([
+          item({
+            item_ref: "item-1",
+            entity_type: "task",
+            fields: { title: "renew the permit" },
+            temporal_expressions: [
+              { field: "deadline", literal: "tomorrow", relation: "on", anchor_entity_id: null, evidence: evidence(17, 25), confidence: "high" },
+            ],
+            field_evidence: [{ field: "title", evidence: evidence(0, 16), confidence: "high" }],
+          }),
+        ]),
+        now,
+        idempotencyKey: nextKey(),
+      }),
+    ).rejects.toThrow(/injected failure/);
+    expect(await db.proposal.count({ where: { captureId: capture.id } })).toBe(0);
+    const untouched = await db.capture.findUniqueOrThrow({ where: { id: capture.id } });
+    expect(untouched.processingStatus).toBe("received");
+    expect(untouched.redactedText).toBeNull();
   });
 
   it("warns about likely duplicates of open tasks", async () => {

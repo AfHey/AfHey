@@ -186,6 +186,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: requiring the client to know whether approval already happened; returning 409 for a retry of successful work.
 - Reason: the engine's apply is idempotent by key; the public wrapper must not undo that guarantee.
 
+## 2026-09-05 Proposal, evidence, and capture finalize atomically (finding 7)
+- Decision: interpretation persists the Proposal, its FieldEvidence, and the Capture's `proposed` transition in one transaction; if the capture is no longer ours to transition, nothing persists at all. Review revision persists supersession, the new Proposal, and carried evidence in one transaction. The Proposal builder accepts an open transaction so callers can compose these units; the orchestrator releases the processing claim as `failed` if interpretation throws.
+- Rejected: leaving approvable proposals without evidence, or captures still eligible for a second extraction, after a mid-sequence failure.
+- Reason: a review must either exist completely or not at all.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

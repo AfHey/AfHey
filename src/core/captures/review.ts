@@ -225,45 +225,49 @@ export async function reviseProposal(
       reason: edit.sourceOperationId ? sourceById.get(edit.sourceOperationId)?.reason ?? undefined : "added at review",
     };
   });
-  const next = await buildProposal(db, {
-    origin: current.origin,
-    idempotencyKey: `revise:${proposalId}:${newUuid()}`,
-    captureId: current.captureId ?? undefined,
-    supersedesProposalId: proposalId,
-    operations,
-  });
-  const carried = ordered
-    .map((i, position) => ({ edit: edits[i], op: next.operations[position] }))
-    .filter(({ edit }) => edit.sourceOperationId && sourceById.has(edit.sourceOperationId));
-  for (const { edit, op } of carried) {
-    const source = sourceById.get(edit.sourceOperationId!)!;
-    const before = (source.after ?? {}) as Record<string, unknown>;
-    const after = (edit.after ?? {}) as Record<string, unknown>;
-    // Evidence follows a field only while the field still says what the
-    // source said (finding 17): a user edit is not source-supported.
-    const unchanged = (fieldPath: string) => {
-      const keys = EVIDENCE_FIELD_KEYS[fieldPath];
-      if (!keys || edit.entityType !== source.entityType) return false;
-      return keys.every((k) => JSON.stringify(before[k] ?? null) === JSON.stringify(after[k] ?? null));
-    };
-    const rows = (await db.fieldEvidence.findMany({ where: { proposalOperationId: edit.sourceOperationId } })).filter(
-      (r) => unchanged(r.fieldPath),
-    );
-    if (rows.length > 0) {
-      await db.fieldEvidence.createMany({
-        data: rows.map((r) => ({
-          proposalOperationId: op.operationId,
-          fieldPath: r.fieldPath,
-          startOffset: r.startOffset,
-          endOffset: r.endOffset,
-          literalText: r.literalText,
-          confidence: r.confidence,
-          resolverMeta: r.resolverMeta ?? undefined,
-        })),
-      });
+  // Supersession, the new proposal, and its carried evidence commit together
+  // (finding 7): a failure anywhere leaves the original review untouched.
+  return db.$transaction(async (tx) => {
+    const next = await buildProposal(tx, {
+      origin: current.origin,
+      idempotencyKey: `revise:${proposalId}:${newUuid()}`,
+      captureId: current.captureId ?? undefined,
+      supersedesProposalId: proposalId,
+      operations,
+    });
+    const carried = ordered
+      .map((i, position) => ({ edit: edits[i], op: next.operations[position] }))
+      .filter(({ edit }) => edit.sourceOperationId && sourceById.has(edit.sourceOperationId));
+    for (const { edit, op } of carried) {
+      const source = sourceById.get(edit.sourceOperationId!)!;
+      const before = (source.after ?? {}) as Record<string, unknown>;
+      const after = (edit.after ?? {}) as Record<string, unknown>;
+      // Evidence follows a field only while the field still says what the
+      // source said (finding 17): a user edit is not source-supported.
+      const unchanged = (fieldPath: string) => {
+        const keys = EVIDENCE_FIELD_KEYS[fieldPath];
+        if (!keys || edit.entityType !== source.entityType) return false;
+        return keys.every((k) => JSON.stringify(before[k] ?? null) === JSON.stringify(after[k] ?? null));
+      };
+      const rows = (await tx.fieldEvidence.findMany({ where: { proposalOperationId: edit.sourceOperationId } })).filter(
+        (r) => unchanged(r.fieldPath),
+      );
+      if (rows.length > 0) {
+        await tx.fieldEvidence.createMany({
+          data: rows.map((r) => ({
+            proposalOperationId: op.operationId,
+            fieldPath: r.fieldPath,
+            startOffset: r.startOffset,
+            endOffset: r.endOffset,
+            literalText: r.literalText,
+            confidence: r.confidence,
+            resolverMeta: r.resolverMeta ?? undefined,
+          })),
+        });
+      }
     }
-  }
-  return next;
+    return next;
+  });
 }
 
 /** Batch undo (rule 10): builds the conflict-aware undo Proposal for review. */

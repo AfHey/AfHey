@@ -82,15 +82,23 @@ export async function processCaptureWithExtraction(
     return { status: "failed", reason: error instanceof Error ? error.message : String(error) };
   }
 
-  const result = await interpretExtraction(db, {
-    captureId,
-    payloadText,
-    mentions,
-    extraction,
-    now,
-    idempotencyKey: options.idempotencyKey ?? `capture:${captureId}:${newUuid()}`,
-    claimKey,
-  });
+  let result;
+  try {
+    result = await interpretExtraction(db, {
+      captureId,
+      payloadText,
+      mentions,
+      extraction,
+      now,
+      idempotencyKey: options.idempotencyKey ?? `capture:${captureId}:${newUuid()}`,
+      claimKey,
+    });
+  } catch (error) {
+    // Interpretation persists atomically (finding 7); an unexpected failure
+    // left nothing behind, so release the claim as failed and report.
+    await releaseCaptureClaim(db, captureId, claimKey, { processingStatus: "failed" });
+    return { status: "failed", reason: error instanceof Error ? error.message : String(error) };
+  }
   if (result.superseded) {
     return { status: "superseded", reason: "the capture was resolved by another action while interpreting" };
   }
