@@ -6,7 +6,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { extractionResultSchema } from "./extraction-contract";
 import { FakeExtractionProvider } from "./fake-extraction";
-import { OpenAIExtractionProvider, type TransportRequest } from "./openai-extraction";
+import {
+  createOpenAIClient,
+  OpenAIExtractionProvider,
+  PROVIDER_CLIENT_OPTIONS,
+  type TransportRequest,
+} from "./openai-extraction";
 import { getExtractionProvider } from "./registry";
 import { ExtractionProviderError, type ExtractionInput } from "./types";
 
@@ -189,6 +194,41 @@ describe("OpenAI provider retry and guard behavior", () => {
 
   it("requires a key or transport", () => {
     expect(() => new OpenAIExtractionProvider({})).toThrow(/API key/);
+  });
+
+  it("owns retrying: the SDK client is created with retries disabled and a per-attempt timeout (finding 9)", () => {
+    const client = createOpenAIClient("test-key-not-real");
+    expect(client.maxRetries).toBe(0);
+    expect(client.timeout).toBe(PROVIDER_CLIENT_OPTIONS.timeout);
+  });
+
+  it("forwards the intent key to every attempt", async () => {
+    const seen: TransportRequest[] = [];
+    const provider = new OpenAIExtractionProvider({
+      transport: (request) => {
+        seen.push(request);
+        return seen.length < 2 ? Promise.reject(new Error("blip")) : Promise.resolve(goodResponse);
+      },
+      sleep,
+    });
+    await provider.extract({ ...fakeInput, intentKey: "intent-1" });
+    expect(seen.map((r) => r.intentKey)).toEqual(["intent-1", "intent-1"]);
+  });
+
+  it("stops retrying once the total time budget is spent", async () => {
+    let clock = 0;
+    let attempts = 0;
+    const provider = new OpenAIExtractionProvider({
+      transport: () => {
+        attempts += 1;
+        clock += 200_000; // each attempt burns far more than the budget
+        return Promise.reject(new Error("slow failure"));
+      },
+      sleep,
+      now: () => clock,
+    });
+    await expect(provider.extract(fakeInput)).rejects.toThrow(/after 1 attempt/);
+    expect(attempts).toBe(1);
   });
 });
 

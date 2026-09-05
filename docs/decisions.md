@@ -201,6 +201,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: trusting the header as-is; building proxy-configuration logic before a hosting decision exists.
 - Reason: the deployment, not the repository, defines the trusted transport; the account and user budgets bound abuse until it does.
 
+## 2026-09-05 One retry layer with a total time budget (finding 9)
+- Decision: the OpenAI client is created with SDK retries disabled and a 60-second per-attempt timeout; the adapter alone retries — at most three attempts, with backoff, inside a 120-second total budget. The orchestration's intent key (the claim/idempotency key) travels with every request as `metadata.intent_key`.
+- Rejected: stacking SDK retries under adapter retries (up to nine HTTP attempts); unbounded wall-clock time for a single extraction.
+- Reason: the spec promises one call with two bounded retries; the promise must hold at the wire.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
