@@ -19,6 +19,8 @@ Status: current. Defined before Phase 1 implementation; keep current thereafter.
 - `ai/adapters/` : TextReasoningProvider, ExtractionProvider, TranscriptionProvider, VoiceRealtimeProvider
 - `ai/redaction/` : deterministic privacy guard for all provider-bound context, with tests; records marked `ai_excluded` are never provider input
 - `core/resolution/` : deterministic entity resolution — lexicon over People/aliases/Projects/glossary, opaque placeholder substitution merged with the guard, candidate-ID context for the provider
+- `core/interpretation/` : deterministic interpretation of extraction results — temporal resolution (dates, instants, DST policy), reference linking to preallocated UUIDs, duplicate warnings, FieldEvidence, Inbox Proposal construction
+- `core/captures/` : Capture lifecycle (create, redaction preview, no-AI path, rejection) and the capture → extraction → Proposal orchestration
 - `core/proposals/` : Proposal creation, validation, tier policy, transactional apply, action log, conflict-aware undo
 - `core/scheduler/` : deterministic scheduling engine and composed operations
 - `core/tools/` : tool registry (primitives + composed operations), stable ID conventions, tier per tool
