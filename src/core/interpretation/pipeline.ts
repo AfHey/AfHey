@@ -21,7 +21,7 @@ import { ProposalValidationError } from "@/core/proposals/errors";
 import { newUuid } from "@/lib/ids";
 import type { Prisma, PrismaClient } from "@/db/generated/client";
 import { findDuplicates, type DuplicateCandidate, type DuplicateWarning } from "./duplicates";
-import { resolveTemporal, type TemporalResolution } from "./temporal";
+import { detectTemporalPhrases, resolveTemporal, type TemporalResolution } from "./temporal";
 
 export interface InterpretationWarning {
   itemRef: string | null;
@@ -75,6 +75,67 @@ interface PreparedItem {
   draft: DraftOperation;
   confidences: Confidence[];
   duplicateCandidate: DuplicateCandidate | null;
+}
+
+const TEMPORAL_FIELDS = new Set([
+  "deadline", "due", "due_date", "remind_at", "reminder", "nudge_date", "nudge",
+  "start", "starts", "when", "on", "start_at", "end", "ends", "end_at",
+]);
+
+/**
+ * Deterministic salvage for a model slip (finding A, 2026-09-05): when an
+ * item carries no temporal expression but its own title/context/notes
+ * contain a recognizable date phrase, recover it as a temporal expression
+ * anchored to the phrase's occurrence in the payload. Only phrases that
+ * can be located in the source are recovered; nothing is invented.
+ */
+function salvageTemporal(
+  item: ExtractionItem,
+  payloadText: string,
+  field: "deadline" | "start",
+): { item: ExtractionItem; recovered: boolean } {
+  if (item.temporal_expressions.some((t) => TEMPORAL_FIELDS.has(t.field))) {
+    return { item, recovered: false };
+  }
+  const fields = { ...item.fields };
+  const sources: Array<[key: string, text: string]> = (["context", "title", "description", "notes"] as const)
+    .filter((k) => typeof fields[k] === "string")
+    .map((k) => [k, fields[k] as string]);
+  const anchor = item.field_evidence[0]?.evidence.start ?? 0;
+  for (const [key, text] of sources) {
+    const phrases = detectTemporalPhrases(text);
+    if (phrases.length === 0) continue;
+    const phrase = phrases[0];
+    const lowerPayload = payloadText.toLowerCase();
+    const needle = phrase.literal.toLowerCase();
+    let best = -1;
+    let index = lowerPayload.indexOf(needle);
+    while (index >= 0) {
+      if (best === -1 || Math.abs(index - anchor) < Math.abs(best - anchor)) best = index;
+      index = lowerPayload.indexOf(needle, index + 1);
+    }
+    if (best === -1) continue;
+    if (key === "context" && text.trim().toLowerCase() === needle) fields.context = null;
+    return {
+      recovered: true,
+      item: {
+        ...item,
+        fields,
+        temporal_expressions: [
+          ...item.temporal_expressions,
+          {
+            field,
+            literal: phrase.literal,
+            relation: phrase.relation,
+            anchor_entity_id: null,
+            evidence: { start: best, end: best + phrase.literal.length },
+            confidence: "medium",
+          },
+        ],
+      },
+    };
+  }
+  return { item, recovered: false };
 }
 
 function evidenceInBounds(item: ExtractionItem, length: number): boolean {
@@ -147,9 +208,24 @@ export async function interpretExtraction(
   const zone = input.now.zoneName!;
 
   const inBounds: ExtractionItem[] = [];
-  for (const item of input.extraction.items) {
-    if (evidenceInBounds(item, input.payloadText.length)) inBounds.push(item);
-    else skipped.push({ itemRef: item.item_ref, reason: "evidence span outside the capture text" });
+  for (const rawItem of input.extraction.items) {
+    if (!evidenceInBounds(rawItem, input.payloadText.length)) {
+      skipped.push({ itemRef: rawItem.item_ref, reason: "evidence span outside the capture text" });
+      continue;
+    }
+    const salvage = salvageTemporal(
+      rawItem,
+      input.payloadText,
+      rawItem.entity_type === "event" ? "start" : "deadline",
+    );
+    if (salvage.recovered) {
+      warnings.push({
+        itemRef: rawItem.item_ref,
+        message: "a date phrase was recovered from the item text; check it",
+        severity: "info",
+      });
+    }
+    inBounds.push(salvage.item);
   }
   const { ordered, cyclic } = orderItems(inBounds);
   for (const ref of cyclic) skipped.push({ itemRef: ref, reason: "circular item dependency" });

@@ -141,6 +141,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: enabling live extraction automatically on a passing run; treating a single 33-case pass as sufficient evidence of real-world quality.
 - Reason: keeps the human decision the spec requires for provider use while recording the measured result.
 
+## 2026-09-05 Temporal cues always travel as temporal fields (finding A)
+- Decision: prompt `p3-2026-09-05` forbids temporal cues in title/context/description/notes, repeats a shared cue on every item it governs, and defines `context` as situational only. Trusted code additionally recovers a recognizable date phrase left in an item's own text as a `medium`-confidence temporal expression anchored to its payload occurrence, clearing a `context` that consisted only of that phrase. Enum fields the model fills with free text are dropped, never stored. A live-provider test path (`npm run test:live`) exercises the pinned model end to end; it is not part of `npm test` or CI.
+- Rejected: relying on the prompt alone (the first live use showed the model can slip); making the deterministic fake mimic every model failure.
+- Reason: a missing due date on a captured task is a silent data loss the review flow may not catch; the salvage is deterministic parsing, not interpretation, and only fires on phrases it can locate in the source.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

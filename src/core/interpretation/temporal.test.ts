@@ -5,7 +5,7 @@
  */
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { parseDurationMinutes, resolveTemporal } from "./temporal";
+import { detectTemporalPhrases, parseDurationMinutes, resolveTemporal } from "./temporal";
 
 // Tuesday 2026-09-01 09:00 in New York (EDT, UTC-4).
 const now = DateTime.fromISO("2026-09-01T09:00:00", { zone: "America/New_York" });
@@ -138,6 +138,24 @@ describe("durations and windows", () => {
 
   it("returns unresolved for text it cannot interpret", () => {
     expect(on("whenever")).toMatchObject({ kind: "unresolved" });
+  });
+});
+
+describe("detectTemporalPhrases", () => {
+  it("finds day, date, time, and duration cues with their relations", () => {
+    const text = "finish the deck by Friday, call at 3pm, review Sept 5 at 10, reply in two hours";
+    const phrases = detectTemporalPhrases(text);
+    expect(phrases.map((p) => [p.literal, p.relation])).toEqual([
+      ["by Friday", "before"],
+      ["at 3pm", "on"],
+      ["Sept 5 at 10", "on"],
+      ["in two hours", "duration_after"],
+    ]);
+    expect(text.slice(phrases[0].start, phrases[0].end)).toBe("by Friday");
+  });
+
+  it("returns nothing for text without temporal cues", () => {
+    expect(detectTemporalPhrases("order printer ink")).toEqual([]);
   });
 });
 

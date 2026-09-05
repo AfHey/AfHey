@@ -336,6 +336,48 @@ function buildInstant(
   };
 }
 
+export interface DetectedTemporalPhrase {
+  literal: string;
+  start: number;
+  end: number;
+  relation: TemporalRelation;
+}
+
+const DAY_CORE =
+  "day after tomorrow|tomorrow|today|tonight|this weekend|next weekend|next week|end of (?:the )?(?:week|month)|(?:(?:next|this|coming) )?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thurs|fri|sat|sun)\\b";
+const DATE_CORE =
+  "\\d{4}-\\d{2}-\\d{2}|(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\\.? \\d{1,2}(?:st|nd|rd|th)?(?:,? \\d{4})?|\\d{1,2}(?:st|nd|rd|th)? (?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\\b|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?";
+const TIME_CORE = "\\d{1,2}:\\d{2}(?: ?(?:am|pm))?|\\d{1,2} ?(?:am|pm)|noon|midnight";
+const DURATION_CORE =
+  "(?:in|within) (?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple of|few) (?:minutes?|mins?|hours?|hrs?|days?|weeks?)";
+
+const PHRASE_PATTERN = new RegExp(
+  `(?:\\b(?:by|before|after|until|due|around|at|on) )?(?:${DURATION_CORE}|(?:${DAY_CORE}|${DATE_CORE})(?: (?:at|around) (?:${TIME_CORE}|\\d{1,2}\\b))?|${TIME_CORE})`,
+  "gi",
+);
+
+/**
+ * Deterministic scan for temporal cues inside free text — used to recover
+ * dates a model left in title/context instead of temporal_expressions. The
+ * returned literal is exactly as written; resolution happens separately.
+ */
+export function detectTemporalPhrases(text: string): DetectedTemporalPhrase[] {
+  const found: DetectedTemporalPhrase[] = [];
+  for (const match of text.matchAll(PHRASE_PATTERN)) {
+    const literal = match[0].trim();
+    if (!literal) continue;
+    const start = match.index + match[0].indexOf(literal);
+    const lower = literal.toLowerCase();
+    let relation: TemporalRelation = "on";
+    if (/^(by|before|until|due)\b/.test(lower)) relation = "before";
+    else if (/^after\b/.test(lower)) relation = "after";
+    else if (/^in\b/.test(lower)) relation = "duration_after";
+    else if (/^within\b/.test(lower)) relation = "within";
+    found.push({ literal, start, end: start + literal.length, relation });
+  }
+  return found;
+}
+
 const worse = (a: Confidence, b: Confidence): Confidence => {
   const rank = { high: 0, medium: 1, needs_confirmation: 2 };
   return rank[a] >= rank[b] ? a : b;

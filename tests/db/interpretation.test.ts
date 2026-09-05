@@ -118,6 +118,36 @@ describe("interpretExtraction", () => {
     expect(refreshed.redactedText).toBe(payload);
   });
 
+  it("recovers a date phrase the model left in context (finding A regression)", async () => {
+    // Mirrors the real failure: three tasks, temporal cues emitted as
+    // `context`, work_type echoing the title, no temporal_expressions.
+    const payload = "Tomorrow call the plumber, order printer ink, and finish the slide deck by Friday";
+    const capture = await newCapture(payload);
+    const slipped = (ref: string, title: string, context: string, start: number) =>
+      item({
+        item_ref: ref,
+        entity_type: "task",
+        fields: { title, task_kind: "action", context, work_type: title },
+        field_evidence: [{ field: "title", evidence: evidence(start, start + title.length), confidence: "high" }],
+      });
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      extraction: result([
+        slipped("item-1", "call the plumber", "Tomorrow", 9),
+        slipped("item-2", "order printer ink", "Tomorrow", 27),
+        slipped("item-3", "finish the slide deck", "by Friday", 50),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const payloads = outcome.proposal!.operations.map((o) => o.after as Record<string, unknown>);
+    expect(payloads.map((p) => p.deadlineDate)).toEqual(["2026-09-02", "2026-09-02", "2026-09-04"]);
+    expect(payloads.map((p) => p.context)).toEqual([null, null, null]);
+    expect(payloads.map((p) => p.workType)).toEqual([null, null, null]);
+    expect(outcome.warnings.filter((w) => /recovered/.test(w.message))).toHaveLength(3);
+  });
+
   it("skips items with out-of-bounds evidence and anything depending on them", async () => {
     const payload = "short";
     const capture = await newCapture(payload);
