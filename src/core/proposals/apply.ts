@@ -155,8 +155,16 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
             { reason: `the capture was already resolved (${capture.processingStatus}); this review is stale` },
           ]);
         }
-        await tx.capture.update({
-          where: { id: capture.id },
+        // The transition is conditional on the exact state just read
+        // (verification item 2): a rejection or keep-private committed between
+        // the read and this write makes the write miss, and the whole apply
+        // rolls back instead of overwriting the user's later decision.
+        const resolved = await tx.capture.updateMany({
+          where: {
+            id: capture.id,
+            processingStatus: { in: ["proposed", "redacted"] },
+            revision: capture.revision,
+          },
           data: {
             processingStatus: "processed",
             rawDeleteAfter: retentionDeadline(),
@@ -165,6 +173,11 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
             revision: { increment: 1 },
           },
         });
+        if (resolved.count !== 1) {
+          throw new ProposalConflictError([
+            { reason: "the capture was resolved another way while this review was being applied; nothing was written" },
+          ]);
+        }
       }
 
       // Undo linkage: only a still-applied original can be reverted (rule 9).

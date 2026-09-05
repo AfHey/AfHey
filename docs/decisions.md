@@ -230,6 +230,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: scoring provider output alone (misses guard, resolution, persistence, and undo); rewording the review's inputs to dodge guard false positives (the guard was corrected instead); an acceptance gate on averages only (a single silent wrong date must fail the run).
 - Reason: the review showed the 100% eval-v1 result measured too little; eval-v2 measures what the user sees and stores.
 
+## 2026-09-05 Apply finalizes the capture only against the state it read (verification item 2)
+- Decision: inside the apply transaction the capture transition to `processed` is a conditional write on the capture's eligible status and the revision the transaction read; a rejection or keep-private that commits in between makes the write miss, the whole apply rolls back, and the proposal is marked conflicted. The race is exercised with a barrier that parks the transaction between its read and its write while the rejection commits on another connection.
+- Rejected: locking the capture row for the duration of the apply (holds a lock across domain writes for no benefit); trusting the pre-write status read (the interleaving the verification described).
+- Reason: every read-then-write on shared state must be conditional on what was read; the user's later decision about a capture wins over an in-flight apply.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

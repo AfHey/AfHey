@@ -19,6 +19,7 @@ import {
 import { applyProposal } from "@/core/proposals/apply";
 import { approveProposal } from "@/core/proposals/lifecycle";
 import type { PrismaClient } from "@/db/generated/client";
+import { withBarrierAfter } from "../helpers/barrier-db";
 import { resetTestDatabase } from "../helpers/test-db";
 
 let db: PrismaClient;
@@ -120,6 +121,30 @@ describe("capture processing claim", () => {
     const applied = await applyProposal(db, outcome.proposal!.id);
     expect(applied.outcome).toBe("conflicted");
     expect(await db.task.count({ where: { captureId: capture.id } })).toBe(0);
+  });
+
+  it("a rejection that commits between the apply's read and its write rolls the apply back (verification item 2)", async () => {
+    const capture = await createCapture(db, { text: "propose, then reject mid-apply", sourceType: "typed" });
+    const outcome = await processCaptureWithExtraction(db, capture.id, new FakeExtractionProvider(), { now });
+    expect(outcome.status).toBe("proposed");
+    if (outcome.status !== "proposed") return;
+    const proposalId = outcome.proposal!.id;
+    await approveProposal(db, proposalId);
+
+    // Park the apply transaction right after it has read the capture as
+    // `proposed`, commit a rejection on another connection, then let it go on.
+    const { db: paused, barrier } = withBarrierAfter(db, "capture", "findUniqueOrThrow");
+    const applying = applyProposal(paused, proposalId);
+    await barrier.reached;
+    await rejectCapture(db, capture.id);
+    barrier.release();
+
+    const result = await applying;
+    expect(result.outcome).toBe("conflicted");
+    expect((await db.capture.findUniqueOrThrow({ where: { id: capture.id } })).processingStatus).toBe("rejected");
+    expect(await db.task.count({ where: { captureId: capture.id } })).toBe(0);
+    expect(await db.actionLog.count({ where: { proposalId } })).toBe(0);
+    expect((await db.proposal.findUniqueOrThrow({ where: { id: proposalId } })).status).toBe("conflicted");
   });
 
   it("a stale claim can be taken over", async () => {
