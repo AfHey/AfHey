@@ -38,6 +38,8 @@ const fieldEvidenceSchema = z.object({
   field: z.string().min(1),
   evidence: evidenceSchema,
   confidence: confidenceSchema,
+  /** Exact source text the field derives from; lets trusted code re-anchor offsets. */
+  quote: z.string().nullable().optional(),
 });
 
 const extractionItemSchema = z.object({

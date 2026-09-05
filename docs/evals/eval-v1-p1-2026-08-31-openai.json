@@ -1,0 +1,4465 @@
+{
+  "ranAt": "2026-09-05T02:17:55.158Z",
+  "provider": "openai",
+  "model": "gpt-5.4-mini-2026-03-17",
+  "promptVersion": "p1-2026-08-31",
+  "datasetVersion": "eval-v1",
+  "metrics": {
+    "cases": 33,
+    "erroredCases": 0,
+    "itemPrecision": 0.972972972972973,
+    "itemRecall": 0.972972972972973,
+    "itemF1": 0.972972972972973,
+    "taskKindAccuracy": 1,
+    "eventKindAccuracy": 1,
+    "durationAccuracy": 1,
+    "temporalRecall": 0.92,
+    "referenceRecall": 1,
+    "evidenceValidity": 0.8858447488584474,
+    "literalAlignment": 0.27586206896551724,
+    "hallucinatedIds": 0
+  },
+  "acceptance": {
+    "accepted": false,
+    "checks": [
+      {
+        "name": "item recall",
+        "threshold": "≥ 85%",
+        "actual": "97.3%",
+        "pass": true
+      },
+      {
+        "name": "item precision",
+        "threshold": "≥ 85%",
+        "actual": "97.3%",
+        "pass": true
+      },
+      {
+        "name": "task_kind accuracy",
+        "threshold": "≥ 85%",
+        "actual": "100.0%",
+        "pass": true
+      },
+      {
+        "name": "temporal literal recall",
+        "threshold": "≥ 85%",
+        "actual": "92.0%",
+        "pass": true
+      },
+      {
+        "name": "reference recall",
+        "threshold": "≥ 90%",
+        "actual": "100.0%",
+        "pass": true
+      },
+      {
+        "name": "evidence validity",
+        "threshold": "≥ 95%",
+        "actual": "88.6%",
+        "pass": false
+      },
+      {
+        "name": "hallucinated ids",
+        "threshold": "= 0",
+        "actual": "0",
+        "pass": true
+      },
+      {
+        "name": "provider errors",
+        "threshold": "= 0",
+        "actual": "0",
+        "pass": true
+      }
+    ]
+  },
+  "scores": [
+    {
+      "caseId": "agenda-note",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 2,
+        "valid": 1,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "all-day-personal",
+      "expectedRequired": 1,
+      "matchedRequired": 0,
+      "falsePositives": 1,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 2,
+        "valid": 0,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": [
+        "missed: cabin",
+        "extra: note \"cabin trip next weekend\""
+      ]
+    },
+    {
+      "caseId": "ambiguous-person",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 6,
+        "valid": 1,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "appointment-explicit-date",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 6,
+        "valid": 6,
+        "literalsAligned": 0,
+        "literalsChecked": 2
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "before-ordinal",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 1,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "bill",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 6,
+        "valid": 0,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "brain-dump",
+      "expectedRequired": 3,
+      "matchedRequired": 3,
+      "falsePositives": 0,
+      "actualCount": 3,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 14,
+        "valid": 14,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "call-family",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 6,
+        "valid": 6,
+        "literalsAligned": 1,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "duration-and-window",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 1,
+        "correct": 1
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 10,
+        "valid": 10,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "email-paste",
+      "expectedRequired": 2,
+      "matchedRequired": 2,
+      "falsePositives": 0,
+      "actualCount": 2,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 2,
+        "hit": 2
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 19,
+        "valid": 19,
+        "literalsAligned": 0,
+        "literalsChecked": 2
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "expires-month",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 6,
+        "valid": 6,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "grocery-list",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 5,
+        "valid": 5,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "iso-hard-deadline",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 4,
+        "valid": 4,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "lunch-event-with-person",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 2,
+        "hit": 2
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 2
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "meeting-with-time",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 2,
+        "literalsChecked": 2
+      },
+      "hallucinatedIds": 0,
+      "notes": [
+        "temporal missed: thursday 3pm"
+      ]
+    },
+    {
+      "caseId": "month-only",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "multi-task-with-person",
+      "expectedRequired": 3,
+      "matchedRequired": 3,
+      "falsePositives": 0,
+      "actualCount": 3,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 2,
+        "hit": 2
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 10,
+        "valid": 10,
+        "literalsAligned": 2,
+        "literalsChecked": 3
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "next-weekday",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 8,
+        "valid": 8,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "non-actionable",
+      "expectedRequired": 0,
+      "matchedRequired": 0,
+      "falsePositives": 0,
+      "actualCount": 0,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 0,
+        "valid": 0,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "note-with-project",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 4,
+        "valid": 4,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "plain-note",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 2,
+        "valid": 2,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "prepare-for-review",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 9,
+        "valid": 9,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "project-reference-end-of-month",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 8,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "prompt-injection",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "redacted-token",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "relative-weeks",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 8,
+        "valid": 8,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "reminder-time",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 5,
+        "literalsAligned": 1,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "simple-errand",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 5,
+        "valid": 5,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "single-task-no-date",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 4,
+        "valid": 4,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "single-task-tomorrow",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 1,
+        "hit": 1
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 7,
+        "valid": 7,
+        "literalsAligned": 0,
+        "literalsChecked": 1
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "time-and-day",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 2,
+        "hit": 2
+      },
+      "references": {
+        "expected": 0,
+        "hit": 0
+      },
+      "evidence": {
+        "spans": 10,
+        "valid": 2,
+        "literalsAligned": 1,
+        "literalsChecked": 2
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "two-people",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 2,
+        "hit": 2
+      },
+      "evidence": {
+        "spans": 5,
+        "valid": 5,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    },
+    {
+      "caseId": "waiting-for",
+      "expectedRequired": 1,
+      "matchedRequired": 1,
+      "falsePositives": 0,
+      "actualCount": 1,
+      "taskKind": {
+        "checked": 1,
+        "correct": 1
+      },
+      "eventKind": {
+        "checked": 0,
+        "correct": 0
+      },
+      "duration": {
+        "checked": 0,
+        "correct": 0
+      },
+      "temporal": {
+        "expected": 0,
+        "hit": 0
+      },
+      "references": {
+        "expected": 1,
+        "hit": 1
+      },
+      "evidence": {
+        "spans": 4,
+        "valid": 4,
+        "literalsAligned": 0,
+        "literalsChecked": 0
+      },
+      "hallucinatedIds": 0,
+      "notes": []
+    }
+  ],
+  "raw": {
+    "single-task-no-date": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Call the dentist to reschedule the cleaning",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 43
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 43
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 43
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 43
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "single-task-tomorrow": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Buy stamps",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "tomorrow",
+              "relation": "after",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 9,
+                "end": 17
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 10
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "meeting-with-time": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "event",
+          "fields": {
+            "title": "Team retro",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": "small conference room",
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": "meeting",
+            "schedule_type": "fixed",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "Thursday",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 10,
+                "end": 18
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "description",
+              "literal": "3pm",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 22,
+                "end": 25
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "location",
+              "evidence": {
+                "start": 29,
+                "end": 51
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "event_kind",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 25
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 25
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "multi-task-with-person": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Send the invoice",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "Tomorrow",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 0,
+                "end": 8
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000a1"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 27,
+                "end": 37
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 10,
+                "end": 26
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "context",
+              "evidence": {
+                "start": 0,
+                "end": 8
+              },
+              "confidence": "high"
+            }
+          ]
+        },
+        {
+          "item_ref": "item-2",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Water the balcony plants",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "other",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "Tomorrow",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 0,
+                "end": 8
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 39,
+                "end": 63
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "context",
+              "evidence": {
+                "start": 0,
+                "end": 8
+              },
+              "confidence": "high"
+            }
+          ]
+        },
+        {
+          "item_ref": "item-3",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Renew the parking permit",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "before Friday",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 65,
+                "end": 78
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 65,
+                "end": 89
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "context",
+              "evidence": {
+                "start": 65,
+                "end": 78
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "appointment-explicit-date": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "event",
+          "fields": {
+            "title": "Dentist appointment",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": "appointment",
+            "schedule_type": "fixed",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "September 12",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 20,
+                "end": 33
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "description",
+              "literal": "9:30am",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 37,
+                "end": 43
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 17
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "event_kind",
+              "evidence": {
+                "start": 0,
+                "end": 17
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 17
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 17
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "all-day-personal": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "note",
+          "fields": {
+            "title": "Cabin trip next weekend",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "next weekend",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 11,
+                "end": 24
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 24
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "waiting-for": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Send the signed lease",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "waiting_for",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [
+            {
+              "field": "waiting_for_person_id",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000b2"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 10,
+                "end": 20
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 21,
+                "end": 40
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "reminder-time": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Take the bins out",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "reminder",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "fixed",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": false,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "at 8pm",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 12,
+                "end": 17
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 25,
+                "end": 41
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 12,
+                "end": 17
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 25,
+                "end": 41
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "plain-note": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "note",
+          "fields": {
+            "title": "Spare key location",
+            "body": "the spare key is in the blue tin on the top shelf",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 30
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 6,
+                "end": 49
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "non-actionable": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": []
+    },
+    "prompt-injection": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Pick up the dry cleaning",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "Saturday",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 53,
+                "end": 61
+              },
+              "confidence": "medium"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 49,
+                "end": 76
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "project-reference-end-of-month": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Draft the Q3 summary for [PROJECT_1]",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "deep",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "due",
+              "literal": "by end of month",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 41,
+                "end": 55
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "project_id",
+              "candidate_ids": [
+                "b0000000-0000-4000-8000-0000000000d4"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 21,
+                "end": 32
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 40
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "ambiguous-person": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Ask [PERSON_1] whether the samples arrived",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000a1",
+                "c0000000-0000-4000-8000-0000000000c3"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 4,
+                "end": 14
+              },
+              "confidence": "needs_confirmation"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "duration-and-window": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Study for the certification exam",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": "this weekend",
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": 120,
+            "is_splittable": true,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "study",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "this weekend",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 39,
+                "end": 52
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 38
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "context",
+              "evidence": {
+                "start": 39,
+                "end": 52
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "estimated_duration_minutes",
+              "evidence": {
+                "start": 16,
+                "end": 29
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 6
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_splittable",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "redacted-token": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Call to confirm the delivery window",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "Tuesday",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 46,
+                "end": 53
+              },
+              "confidence": "medium"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "waiting_for_person_id",
+              "candidate_ids": [],
+              "unresolved_literal": "[REDACTED_PHONE_1]",
+              "evidence": {
+                "start": 5,
+                "end": 22
+              },
+              "confidence": "needs_confirmation"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 4
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 4
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 4
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 4
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "email-paste": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Send updated budget spreadsheet",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": "Requested by [PERSON_1].",
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "notes",
+              "literal": "Wednesday",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 31,
+                "end": 40
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000b2"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 12,
+                "end": 46
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "notes",
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 12,
+                "end": 46
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 12,
+                "end": 46
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 12,
+                "end": 46
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 12,
+                "end": 46
+              },
+              "confidence": "medium"
+            }
+          ]
+        },
+        {
+          "item_ref": "item-2",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Schedule a 30-minute sync to review the vendor list",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": "Requested by [PERSON_1].",
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": 30,
+            "is_splittable": false,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "notes",
+              "literal": "next week",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 76,
+                "end": 85
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000b2"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 49,
+                "end": 103
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "notes",
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 49,
+                "end": 103
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 113
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "estimated_duration_minutes",
+              "evidence": {
+                "start": 59,
+                "end": 72
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "is_splittable",
+              "evidence": {
+                "start": 49,
+                "end": 103
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 49,
+                "end": 103
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 49,
+                "end": 103
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "bill": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Pay the electricity bill",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "month-only": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Book flights for the conference in Lisbon",
+            "body": "Book flights for the conference in Lisbon in October",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": "Lisbon",
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "in October",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 40,
+                "end": 50
+              },
+              "confidence": "medium"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 39
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 0,
+                "end": 50
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "location",
+              "evidence": {
+                "start": 29,
+                "end": 35
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 50
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 50
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 50
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "iso-hard-deadline": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Submit the grant report",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "notes",
+              "literal": "2026-11-30",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 35,
+                "end": 45
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 25
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 25
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 25
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "lunch-event-with-person": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "event",
+          "fields": {
+            "title": "Lunch with [PERSON_1]",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": "personal",
+            "schedule_type": "fixed",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "Friday",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 16,
+                "end": 22
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "description",
+              "literal": "at noon",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 23,
+                "end": 30
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000c3"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 10,
+                "end": 20
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 20
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "event_kind",
+              "evidence": {
+                "start": 0,
+                "end": 20
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 20
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 20
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "brain-dump": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Fix the bike tire",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 11,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 11,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 11,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 11,
+                "end": 27
+              },
+              "confidence": "medium"
+            }
+          ]
+        },
+        {
+          "item_ref": "item-2",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Email the landlord about the leak",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 29,
+                "end": 63
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 29,
+                "end": 63
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 29,
+                "end": 63
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 29,
+                "end": 63
+              },
+              "confidence": "medium"
+            }
+          ]
+        },
+        {
+          "item_ref": "item-3",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Look into a new laptop",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "backlog",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "other",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "sometime",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 80,
+                "end": 88
+              },
+              "confidence": "medium"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 65,
+                "end": 87
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 65,
+                "end": 87
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 65,
+                "end": 87
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 65,
+                "end": 87
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 65,
+                "end": 87
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "next-weekday": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Return the library books",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "reminder",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "next Tuesday",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 36,
+                "end": 48
+              },
+              "confidence": "medium"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 26
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "note-with-project": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "note",
+          "fields": {
+            "title": "[PROJECT_1] kickoff went well",
+            "body": "the team prefers async updates",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [
+            {
+              "field": "project_id",
+              "candidate_ids": [
+                "b0000000-0000-4000-8000-0000000000e5"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 9,
+                "end": 19
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 38
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 40,
+                "end": 73
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "project_id",
+              "evidence": {
+                "start": 9,
+                "end": 19
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    },
+    "simple-errand": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Order coffee filters",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 19
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 19
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 19
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 19
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 19
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "relative-weeks": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Schedule a follow-up",
+            "body": "Doctor said to schedule a follow-up in six weeks",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "reminder",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "body",
+              "literal": "in six weeks",
+              "relation": "after",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 33,
+                "end": 45
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 28
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 45
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "prepare-for-review": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Prepare slides for review",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "deep",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "Sept 5 at 10",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 40,
+                "end": 52
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [
+            {
+              "field": "project_id",
+              "candidate_ids": [
+                "b0000000-0000-4000-8000-0000000000d4"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 18,
+                "end": 28
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 18
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "time-and-day": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Move the car before street cleaning",
+            "body": "Move the car before street cleaning at 8am tomorrow",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "reminder",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": false,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "before street cleaning",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 14,
+                "end": 35
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "description",
+              "literal": "8am tomorrow",
+              "relation": "on",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 39,
+                "end": 52
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 35
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "all_day",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 52
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "two-people": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Ask [PERSON_1] and [PERSON_2] for their availability for the workshop",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [
+            {
+              "field": "people",
+              "candidate_ids": [
+                "c0000000-0000-4000-8000-0000000000a1",
+                "c0000000-0000-4000-8000-0000000000b2"
+              ],
+              "unresolved_literal": null,
+              "evidence": {
+                "start": 4,
+                "end": 23
+              },
+              "confidence": "high"
+            }
+          ],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 54
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 54
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 54
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 54
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "expires-month": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Renew passport",
+            "body": "It expires in March",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "backlog",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "body",
+              "literal": "in March",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 26,
+                "end": 34
+              },
+              "confidence": "needs_confirmation"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 15
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 21,
+                "end": 34
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 15
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 34
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 15
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "grocery-list": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Groceries",
+            "body": "milk, eggs, spinach, oat milk",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "backlog",
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": "errand",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 11,
+                "end": 35
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 9
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "call-family": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Call mom",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "reminder",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": false,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "context",
+              "literal": "this weekend",
+              "relation": "within",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 8,
+                "end": 20
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 7
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "before-ordinal": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "task",
+          "fields": {
+            "title": "Cancel the gym membership",
+            "body": null,
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": "action",
+            "bucket": "active",
+            "event_kind": null,
+            "schedule_type": "flexible",
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": true,
+            "energy_level": null,
+            "work_type": "communication",
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [
+            {
+              "field": "description",
+              "literal": "before the 1st",
+              "relation": "before",
+              "anchor_entity_id": null,
+              "evidence": {
+                "start": 27,
+                "end": 40
+              },
+              "confidence": "high"
+            }
+          ],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "bucket",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "task_kind",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "schedule_type",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "is_schedulable",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            },
+            {
+              "field": "work_type",
+              "evidence": {
+                "start": 0,
+                "end": 27
+              },
+              "confidence": "medium"
+            }
+          ]
+        }
+      ]
+    },
+    "agenda-note": {
+      "schema_version": "1",
+      "prompt_version": "p1-2026-08-31",
+      "items": [
+        {
+          "item_ref": "item-1",
+          "depends_on_item_refs": [],
+          "entity_type": "note",
+          "fields": {
+            "title": "Draft agenda",
+            "body": "1) budget 2) hiring 3) roadmap",
+            "name": null,
+            "description": null,
+            "notes": null,
+            "location": null,
+            "context": null,
+            "task_kind": null,
+            "bucket": null,
+            "event_kind": null,
+            "schedule_type": null,
+            "all_day": null,
+            "estimated_duration_minutes": null,
+            "is_splittable": null,
+            "is_schedulable": null,
+            "energy_level": null,
+            "work_type": null,
+            "proposed_priority_score": null,
+            "role": null
+          },
+          "temporal_expressions": [],
+          "entity_references": [],
+          "field_evidence": [
+            {
+              "field": "title",
+              "evidence": {
+                "start": 0,
+                "end": 13
+              },
+              "confidence": "high"
+            },
+            {
+              "field": "body",
+              "evidence": {
+                "start": 15,
+                "end": 45
+              },
+              "confidence": "high"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

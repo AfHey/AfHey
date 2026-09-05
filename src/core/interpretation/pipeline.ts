@@ -161,8 +161,21 @@ export async function interpretExtraction(
     item: ExtractionItem,
     fieldNames: string[],
   ): { resolution: TemporalResolution; literal: string; confidence: Confidence } | null => {
-    const expression = item.temporal_expressions.find((t) => fieldNames.includes(t.field));
-    if (!expression) return null;
+    const expressions = item.temporal_expressions.filter((t) => fieldNames.includes(t.field));
+    if (expressions.length === 0) return null;
+    // A day and a time often arrive as separate literals ("Thursday", "3pm");
+    // resolving them together yields the instant, so try the combination first.
+    if (expressions.length > 1) {
+      const combined = expressions.map((t) => t.literal).join(" ");
+      const together = resolveTemporal(combined, expressions[0].relation, { now: input.now });
+      if (together.kind === "date" || together.kind === "instant") {
+        const confidence = expressions.some((t) => t.confidence === "needs_confirmation")
+          ? "needs_confirmation"
+          : expressions.some((t) => t.confidence === "medium") ? "medium" : "high";
+        return { resolution: together, literal: combined, confidence };
+      }
+    }
+    const expression = expressions[0];
     const resolution = resolveTemporal(expression.literal, expression.relation, { now: input.now });
     return { resolution, literal: expression.literal, confidence: expression.confidence };
   };

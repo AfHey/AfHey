@@ -7,6 +7,7 @@
  */
 import OpenAI from "openai";
 import { runGuard } from "@/ai/redaction/guard";
+import { snapEvidence } from "./evidence";
 import { extractionResultSchema, type ExtractionResult } from "./extraction-contract";
 import {
   buildUserContent,
@@ -81,7 +82,7 @@ export class OpenAIExtractionProvider implements ExtractionProvider {
           systemPrompt: SYSTEM_PROMPT,
           userContent,
         });
-        return extractionResultSchema.parse(JSON.parse(raw));
+        return snapEvidence(extractionResultSchema.parse(JSON.parse(raw)), input);
       } catch (error) {
         lastError = error;
       }

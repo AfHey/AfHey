@@ -59,6 +59,10 @@ To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey
 
 All of `lint`, `typecheck`, `test`, and (once present for the touched area) `test:e2e` run before every commit.
 
+## Extraction evaluation
+
+`npm run eval:extraction` runs the versioned extraction evaluation (spec §14.3) against the pinned OpenAI model — 33 fictional cases, field-level scoring — and writes a report to `docs/evals/` recording model, prompt version, dataset version, metrics, and the acceptance result. It costs real API calls; `npm run eval:extraction -- --fake` exercises the pipeline without any. Re-run it after any prompt, model, or dataset change. Live extraction (`EXTRACTION_PROVIDER=openai`) is enabled only by the product owner after an accepted run.
+
 ## Maintenance jobs
 
 `npm run jobs:expire` runs the capture-text retention job (spec §9.5, §13): captures whose 30-day clock has passed lose their raw/redacted text and evidence literals (rows stay; the Inbox shows "source expired"), and captures never resolved within 30 days are discarded the same way. It is idempotent and safe to run any time. Schedule it daily — for example with `launchd` on the Mac that hosts the app, or cron:
