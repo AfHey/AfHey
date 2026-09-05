@@ -58,6 +58,23 @@ describe("false-positive damping", () => {
     expect(types("see you Tuesday Afternoon")).toEqual([]);
     expect(types("January Report is due")).toEqual([]);
   });
+
+  it("does not treat a capitalized word before a weekday, or before a month and day, as a name (eval-v2)", () => {
+    expect(detectSpans("Dentist February 30 at 9am")).toEqual([]);
+    expect(detectSpans("Retreat September 12 through September 14")).toEqual([]);
+    expect(detectSpans("Appointment Thursday at 2pm")).toEqual([]);
+    // A month with no day number after it stays a possible surname.
+    expect(types("Theresa May said hello")).toEqual(["name"]);
+  });
+
+  it("does not treat an imperative verb + name as a name pair, but still masks the pair that follows (eval-v2)", () => {
+    expect(detectSpans("Add Neri as a new person, then ask Neri for the quote")).toEqual([]);
+    expect(detectSpans("Meet Olin on Thursday")).toEqual([]);
+    // Rescan from the second word: the real name pair is still caught.
+    const spans = detectSpans("Call Ada Byron tomorrow");
+    expect(spans).toEqual([{ type: "name", start: 5, end: 14 }]);
+    expect(detectSpans("Monday Ada Byron reviews")).toEqual([{ type: "name", start: 7, end: 16 }]);
+  });
 });
 
 describe("masking", () => {

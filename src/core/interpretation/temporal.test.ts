@@ -7,7 +7,7 @@
  */
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { detectTemporalPhrases, parseDurationMinutes, resolveTemporal, resolveTemporalRange } from "./temporal";
+import { detectTemporalPhrases, parseDurationMinutes, resolveTemporal, resolveTemporalRange, zoneSpecAfter, zoneSpecIn } from "./temporal";
 
 // Tuesday 2026-09-01 09:00 in New York (EDT, UTC-4).
 const now = DateTime.fromISO("2026-09-01T09:00:00", { zone: "America/New_York" });
@@ -136,8 +136,26 @@ describe("durations and anchors (finding 12)", () => {
   it("calendar durations follow the wall clock across a fall-back day", () => {
     const halfPastMidnight = DateTime.fromISO("2026-11-01T00:30:00", { zone: "America/New_York" });
     expect(resolveTemporal("in one day", "duration_after", { now: halfPastMidnight })).toMatchObject({ kind: "date", date: "2026-11-02" });
+    // "calendar" spelled out (eval-v2 case 16) is the same wall-clock day count.
+    expect(resolveTemporal("in one calendar day", "within", { now: halfPastMidnight })).toMatchObject({ kind: "date", date: "2026-11-02" });
     expect(resolveTemporal("in three days", "duration_after", ctx)).toMatchObject({ kind: "date", date: "2026-09-04" });
     expect(resolveTemporal("within two weeks", "within", ctx)).toMatchObject({ kind: "date", date: "2026-09-15", confidence: "medium" });
+  });
+
+  it("finds a zone written right after a phrase, and resolves with it (eval-v2 cases 12 and 14)", () => {
+    const fallBack = "Appointment November 1, 2026 at 1:30am, UTC−05:00.";
+    expect(zoneSpecAfter(fallBack, fallBack.indexOf(", UTC"))).toBe("UTC−05:00");
+    const london = "Design review September 12, 2026, 9am Europe/London, ending 10am there.";
+    expect(zoneSpecAfter(london, london.indexOf(" Europe"))).toBe("Europe/London");
+    expect(zoneSpecAfter("call at 5pm tomorrow, then rest", 11)).toBeNull();
+    expect(zoneSpecAfter("meet at Boston/Cambridge", 4)).toBeNull();
+    expect(zoneSpecIn("9am Europe/London")).toBe("Europe/London");
+    expect(zoneSpecIn("9am tomorrow")).toBeNull();
+    expect(resolveTemporal("November 1, 2026 at 1:30am UTC−05:00", "on", ctx)).toMatchObject({
+      kind: "instant",
+      instant: "2026-11-01T06:30:00.000Z",
+      timezone: "America/New_York",
+    });
   });
 
   it("a duration relative to an unidentified anchor is never resolved from now", () => {

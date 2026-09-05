@@ -64,7 +64,7 @@ function quantity(word: string): number | null {
 }
 
 const DURATION_RE =
-  /\b(\d+(?:\.\d+)?|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple(?:\s+of)?|few)\s*(minutes?|mins?|hours?|hrs?|h|days?|weeks?)\b/;
+  /\b(\d+(?:\.\d+)?|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple(?:\s+of)?|few)\s*(?:calendar\s+)?(minutes?|mins?|hours?|hrs?|h|days?|weeks?)\b/;
 
 interface ParsedDuration {
   minutes: number;
@@ -277,6 +277,26 @@ function parseZoneSpec(literal: string): ZoneSpec | null {
     return { zone: "UTC", offsetMinutes: null, match: /\b(?:UTC|GMT)\b/i.exec(literal)?.[0] ?? "Z" };
   }
   return null;
+}
+
+/** Zone text inside a literal ("Europe/London", "UTC−05:00", "GMT"), or null. */
+export function zoneSpecIn(literal: string): string | null {
+  return parseZoneSpec(literal)?.match ?? null;
+}
+
+/**
+ * A zone written immediately after a temporal phrase (", UTC−05:00",
+ * " Europe/London") that the provider left outside the literal (eval-v2
+ * cases 12 and 14). Deterministic code, not the model, decides the zone.
+ */
+export function zoneSpecAfter(text: string, index: number): string | null {
+  const tail = text.slice(index, index + 48);
+  const lead = /^[\s,;:—–-]*(?:(?:in|at)\s+)?/.exec(tail)?.[0] ?? "";
+  const rest = tail.slice(lead.length);
+  const iana = /^([A-Za-z]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?)(?![\w/])/.exec(rest);
+  if (iana && IANAZone.isValidZone(iana[1])) return iana[1];
+  const offset = /^(?:UTC|GMT)\s*[+\-−–]\s*\d{1,2}(?::?\d{2})?(?![\d:])|^(?:UTC|GMT)\b/i.exec(rest);
+  return offset ? offset[0] : null;
 }
 
 // --- DST-aware local time construction (finding 10) ------------------------

@@ -7,7 +7,7 @@
 import type { ExtractionInput } from "./types";
 
 export const EXTRACTION_MODEL = "gpt-5.4-mini-2026-03-17";
-export const PROMPT_VERSION = "p5-2026-09-05";
+export const PROMPT_VERSION = "p7-2026-09-05";
 
 export const SYSTEM_PROMPT = `You are the extraction component of a personal task manager. You read one captured text and return structured candidate items (tasks, events, notes, and proposed people/projects) as JSON matching the provided schema. Follow these rules exactly:
 
@@ -21,7 +21,13 @@ export const SYSTEM_PROMPT = `You are the extraction component of a personal tas
 7. fields may include: title, body, name, description, notes, location, context, task_kind, bucket, deadline_type, event_kind, schedule_type, all_day, estimated_duration_minutes, is_splittable, is_schedulable, energy_level, work_type, proposed_priority_score, role. deadline_type is "hard" when the text marks the date as firm ("hard deadline", "no later than", "must be submitted by", "final"), "soft" when it is aspirational ("ideally", "try to", "aim for"), otherwise null. For an event whose text gives an end ("9am–11am", "until 4pm", "through the 14th"), emit a second temporal_expressions entry with field "end". Use null for anything not present in the capture. Do not fabricate values. "context" means situational context only (a place, tool, or mode such as "at the office" or "needs laptop") — never a date, time, or person. Enum fields (task_kind, bucket, event_kind, schedule_type, energy_level, work_type) take only their listed values or null; work_type is a category (deep | shallow | study | communication | errand | other), never a restatement of the title.
 8. item_ref values are "item-1", "item-2", ... unique within this response. Use depends_on_item_refs only for references to other items in this response.
 9. Confidence per §evidence: "high" when explicit, "medium" when inferred, "needs_confirmation" when ambiguous (including ambiguous placeholder candidates marked ambiguous in the resolution context).
-10. If the capture contains nothing actionable, return an empty items array.`;
+10. If the capture contains nothing actionable, return an empty items array.
+11. Corrections and retractions: when the capture withdraws or replaces something ("actually, don't", "scratch that", "moved to Thursday", "use the latest time"), output only the final intent. Never output the withdrawn or superseded item, and attach evidence to the correcting words.
+12. A phrase that only names an existing event or record as a time anchor ("two hours after the launch meeting") is part of that temporal literal, not an item of its own; never create a note for it.
+13. Any timezone or offset written with a time ("UTC−05:00", "Europe/London", "9am London time") belongs inside that temporal literal. A zone is never a location.
+14. Exactly one item per real-world thing: never emit both a task and an event for the same commitment; never emit a note that merely repeats a task or event you already extracted or copies the whole capture; an instruction to create a record ("add Neri as a new person", "create project X") is that person/project item itself, not a task.
+15. task_kind "reminder" only when the text asks to be reminded or nudged ("remind me…"); an instruction to do something by a time ("submit the form within two hours") is task_kind "action" with a deadline.
+16. A time range written with a day ("September 12, 9am–11am") is one start literal containing the range; do not split it into a date-only start and a range-only end.`;
 
 export function buildUserContent(input: ExtractionInput): string {
   const context =

@@ -27,6 +27,8 @@ import {
   detectTemporalPhrases,
   resolveTemporal,
   resolveTemporalRange,
+  zoneSpecAfter,
+  zoneSpecIn,
   type TemporalContext,
   type TemporalResolution,
 } from "./temporal";
@@ -91,6 +93,11 @@ interface PreparedItem {
   duplicateCandidate: DuplicateCandidate | null;
 }
 
+/** "9am–11am", "9–11am", "9:00–11:00am": a clock-time range. */
+const TIME_RANGE_RE = /\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[–—-]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i;
+/** Any clock time inside a phrase. */
+const TIME_RE = /\d{1,2}:\d{2}|\b\d{1,2}\s*(?:am|pm)\b/i;
+
 const TEMPORAL_FIELDS = new Set([
   "deadline", "due", "due_date", "remind_at", "reminder", "nudge_date", "nudge",
   "start", "starts", "when", "on", "start_at", "end", "ends", "end_at",
@@ -150,6 +157,85 @@ function salvageTemporal(
     };
   }
   return { item, recovered: false };
+}
+
+const TITLE_FIELDS = new Set(["title", "name", "body"]);
+const COLLAPSE_PREFERENCE: Record<string, number> = { event: 0, task: 1, note: 2 };
+
+/**
+ * Redundant-item collapse (eval-v2, 2026-09-05). Two items whose title and
+ * temporal evidence spans are identical describe the same source fact (the
+ * model emitted one commitment as both a task and an event): the richer one
+ * is kept (event > task > note). A note whose body is the entire capture is
+ * dropped when anything else was extracted. Dependencies on a dropped item
+ * follow the kept one. Nothing is invented; only duplicates are removed.
+ */
+function collapseRedundantItems(
+  items: ExtractionItem[],
+  payloadText: string,
+  warnings: InterpretationWarning[],
+): ExtractionItem[] {
+  const signature = (item: ExtractionItem): string | null => {
+    if (!COLLAPSE_PREFERENCE.hasOwnProperty(item.entity_type)) return null;
+    const title = item.field_evidence.find((fe) => TITLE_FIELDS.has(fe.field));
+    if (!title || title.evidence.end <= title.evidence.start) return null;
+    const temporal = item.temporal_expressions
+      .map((t) => `${t.evidence.start}-${t.evidence.end}`)
+      .sort()
+      .join(",");
+    return `${title.evidence.start}-${title.evidence.end}|${temporal}`;
+  };
+
+  const keptBySignature = new Map<string, ExtractionItem>();
+  const replacedBy = new Map<string, string>();
+  const survivors: ExtractionItem[] = [];
+  for (const item of items) {
+    const sig = signature(item);
+    const existing = sig ? keptBySignature.get(sig) : undefined;
+    if (!sig || !existing) {
+      if (sig) keptBySignature.set(sig, item);
+      survivors.push(item);
+      continue;
+    }
+    const keep = COLLAPSE_PREFERENCE[item.entity_type] < COLLAPSE_PREFERENCE[existing.entity_type] ? item : existing;
+    const drop = keep === item ? existing : item;
+    if (keep === item) {
+      keptBySignature.set(sig, item);
+      survivors[survivors.indexOf(existing)] = item;
+    }
+    replacedBy.set(drop.item_ref, keep.item_ref);
+    warnings.push({
+      itemRef: keep.item_ref,
+      message: `two items described the same source span; kept the ${keep.entity_type} and dropped the ${drop.entity_type}`,
+      severity: "info",
+    });
+  }
+
+  const whole = payloadText.replace(/\s+/g, " ").trim().toLowerCase();
+  const echoes = survivors.filter(
+    (item) =>
+      item.entity_type === "note" &&
+      survivors.length > 1 &&
+      String(item.fields.body ?? "").replace(/\s+/g, " ").trim().toLowerCase() === whole,
+  );
+  for (const echo of echoes) {
+    replacedBy.set(echo.item_ref, "");
+    warnings.push({ itemRef: echo.item_ref, message: "a note repeating the whole capture was dropped", severity: "info" });
+  }
+  const dropped = new Set(echoes.map((e) => e.item_ref));
+
+  return survivors
+    .filter((item) => !dropped.has(item.item_ref))
+    .map((item) => ({
+      ...item,
+      depends_on_item_refs: [
+        ...new Set(
+          item.depends_on_item_refs
+            .map((ref) => replacedBy.get(ref) ?? ref)
+            .filter((ref) => ref !== "" && ref !== item.item_ref),
+        ),
+      ],
+    }));
 }
 
 const REFERENCE_FIELD_TYPE: Record<string, "person" | "project"> = {
@@ -344,7 +430,7 @@ export async function interpretExtraction(
     }
     inBounds.push(salvage.item);
   }
-  const { ordered, cyclic } = orderItems(inBounds);
+  const { ordered, cyclic } = orderItems(collapseRedundantItems(inBounds, input.payloadText, warnings));
   for (const ref of cyclic) skipped.push({ itemRef: ref, reason: "circular item dependency" });
 
   const prepared = new Map<string, PreparedItem>();
@@ -355,7 +441,15 @@ export async function interpretExtraction(
     fieldNames: string[],
     extra: Partial<TemporalContext> = {},
   ): { resolution: TemporalResolution; literal: string; confidence: Confidence } | null => {
-    const expressions = item.temporal_expressions.filter((t) => fieldNames.includes(t.field));
+    const expressions = item.temporal_expressions
+      .filter((t) => fieldNames.includes(t.field))
+      .map((t) => {
+        // A zone the provider left just outside the literal (", UTC−05:00",
+        // " Europe/London") belongs to the phrase (eval-v2 cases 12 and 14).
+        if (zoneSpecIn(t.literal)) return t;
+        const trailing = zoneSpecAfter(input.payloadText, t.evidence.end);
+        return trailing ? { ...t, literal: `${t.literal} ${trailing}` } : t;
+      });
     if (expressions.length === 0) return null;
     const context: TemporalContext = { now: input.now, ...extra };
     // A day and a time often arrive as separate literals ("Thursday", "3pm");
@@ -617,11 +711,18 @@ export async function interpretExtraction(
         // is resolved as a whole; an explicit end resolves relative to the
         // start's day and is never replaced by an invented duration.
         const startFields = ["start", "starts", "when", "on", "start_at"];
-        const startLiteral = item.temporal_expressions
+        const endFields = ["end", "ends", "end_at"];
+        const startOnly = item.temporal_expressions
           .filter((t) => startFields.includes(t.field))
           .map((t) => t.literal)
           .join(" ");
+        // A time range the provider filed as the end ("September 12" + "9am–11am")
+        // belongs to the start phrase; resolve them as one range (eval-v2 case 20).
+        const rangeEnd = item.temporal_expressions.find((t) => endFields.includes(t.field) && TIME_RANGE_RE.test(t.literal));
+        const startLiteral =
+          startOnly && rangeEnd && !TIME_RE.test(startOnly) ? `${startOnly}, ${rangeEnd.literal}` : startOnly;
         const range = startLiteral ? resolveTemporalRange(startLiteral, { now: input.now }) : null;
+        const endConsumed = range !== null && range.kind === "instants" && startLiteral !== startOnly;
         const start = range
           ? {
               resolution:
@@ -647,7 +748,13 @@ export async function interpretExtraction(
                   day: Number(s.date.slice(8, 10)),
                 }).startOf("day")
               : undefined;
-        const end = resolve(item, ["end", "ends", "end_at"], startDay ? { referenceDay: startDay } : {});
+        // An end phrase belongs to the event's own zone ("ending 10am there").
+        const end = endConsumed
+          ? null
+          : resolve(item, endFields, {
+              ...(startDay ? { referenceDay: startDay } : {}),
+              ...(s?.kind === "instant" ? { now: input.now.setZone(s.timezone) } : {}),
+            });
         if (!s || (s.kind !== "date" && s.kind !== "instant")) {
           // No usable time: keep the content as a task rather than losing it.
           warnings.push({

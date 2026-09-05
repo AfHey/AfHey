@@ -360,6 +360,86 @@ describe("interpretExtraction", () => {
     expect(new Set(links.map((l) => l.personId))).toEqual(new Set([known.id, personOp.entityId]));
   });
 
+  it("recovers a zone left outside the literal and resolves the end in the event's zone (eval-v2 cases 12 and 14)", async () => {
+    const payload = "Design review September 12, 2026, 9am Europe/London, ending 10am there.";
+    const capture = await newCapture(payload);
+    const startLiteral = "September 12, 2026, 9am";
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "event",
+          fields: { title: "Design review", event_kind: "meeting" },
+          temporal_expressions: [
+            { field: "start", literal: startLiteral, relation: "on", anchor_entity_id: null, evidence: evidence(payload.indexOf(startLiteral), payload.indexOf(startLiteral) + startLiteral.length), confidence: "high" },
+            { field: "end", literal: "10am", relation: "on", anchor_entity_id: null, evidence: evidence(payload.indexOf("10am"), payload.indexOf("10am") + 4), confidence: "high" },
+          ],
+          field_evidence: [{ field: "title", evidence: evidence(0, 13), confidence: "high" }],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const after = outcome.proposal!.operations[0].after as { startAt: string; endAt: string; timezone: string };
+    expect(after.timezone).toBe("Europe/London");
+    expect(after.startAt).toBe("2026-09-12T08:00:00.000Z");
+    expect(after.endAt).toBe("2026-09-12T09:00:00.000Z");
+  });
+
+  it("collapses a task and an event that share the same source spans, and drops a note echoing the whole capture (eval-v2 cases 2 and 15)", async () => {
+    const payload = "Latest: review moved to Thursday at 2pm.";
+    const capture = await newCapture(payload);
+    const title = { field: "title", evidence: evidence(8, 14), confidence: "high" as const };
+    const when = (field: string) => ({ field, literal: "Thursday at 2pm", relation: "on" as const, anchor_entity_id: null, evidence: evidence(24, 39), confidence: "high" as const });
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({ item_ref: "item-1", entity_type: "task", fields: { title: "review" }, temporal_expressions: [when("deadline")], field_evidence: [title] }),
+        item({ item_ref: "item-2", entity_type: "event", fields: { title: "review", event_kind: "meeting" }, temporal_expressions: [when("start")], field_evidence: [title] }),
+        item({ item_ref: "item-3", entity_type: "note", fields: { body: payload }, field_evidence: [{ field: "body", evidence: evidence(0, payload.length), confidence: "high" }] }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    expect(outcome.proposal!.operations.map((o) => o.entityType)).toEqual(["event"]);
+    expect((outcome.proposal!.operations[0].after as { startAt: string }).startAt).toBe("2026-09-03T18:00:00.000Z");
+    expect(outcome.warnings.some((w) => /same source span/.test(w.message))).toBe(true);
+    expect(outcome.warnings.some((w) => /repeating the whole capture/.test(w.message))).toBe(true);
+  });
+
+  it("merges a date-only start with a time-range end into one timed event (eval-v2 case 20)", async () => {
+    const payload = "Meet [PERSON_1] September 12, 9am–11am.";
+    const capture = await newCapture(payload);
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "event",
+          fields: { title: "Meet [PERSON_1]", event_kind: "meeting" },
+          temporal_expressions: [
+            { field: "start", literal: "September 12", relation: "on", anchor_entity_id: null, evidence: evidence(16, 28), confidence: "high" },
+            { field: "end", literal: "9am–11am", relation: "on", anchor_entity_id: null, evidence: evidence(30, 38), confidence: "high" },
+          ],
+          field_evidence: [{ field: "title", evidence: evidence(0, 15), confidence: "high" }],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const after = outcome.proposal!.operations[0].after as { startAt?: string; endAt?: string; allDayStartDate?: string };
+    expect(after.allDayStartDate).toBeUndefined();
+    expect(after.startAt).toBe("2026-09-12T13:00:00.000Z");
+    expect(after.endAt).toBe("2026-09-12T15:00:00.000Z");
+  });
+
   it("ignores a fabricated temporal literal and flags a title without evidence (finding 17)", async () => {
     const payload = "renew the parking permit";
     const capture = await newCapture(payload);

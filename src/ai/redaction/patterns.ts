@@ -30,11 +30,28 @@ interface Detector {
 // Words that start a capitalized pair without being a person name. Small and
 // deliberate — this is a false-positive damper, never a privacy whitelist
 // (unknown names still match; these words are not names at all).
-const NAME_PAIR_STOPWORDS = new Set([
+const WEEKDAYS = new Set([
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+]);
+const MONTHS = new Set([
   "january", "february", "march", "april", "may", "june", "july", "august",
   "september", "october", "november", "december",
+]);
+const NAME_PAIR_STOPWORDS = new Set([
+  ...WEEKDAYS,
+  ...MONTHS,
   "the", "this", "that", "next", "last", "every",
+]);
+// Sentence-initial imperative verbs ("Add Neri", "Call Ada"): the verb is not
+// a name, and a lone first name after a lowercase verb is not masked either,
+// so this only removes a false positive that the preview could never repair
+// (edits are re-guarded in full). None of these words is a plausible given
+// name (eval-v2, 2026-09-05).
+const LEADING_VERBS = new Set([
+  "add", "ask", "book", "bring", "buy", "call", "cancel", "check", "confirm", "contact",
+  "email", "finish", "follow", "invite", "meet", "message", "order", "pay", "ping", "prepare",
+  "remind", "reply", "return", "review", "schedule", "send", "submit", "tell", "text", "thank",
+  "update", "visit", "write",
 ]);
 
 const DETECTORS: Detector[] = [
@@ -84,8 +101,22 @@ export function detectSpans(text: string): RedactionSpan[] {
   const raw: RedactionSpan[] = [];
   for (const { type, pattern, pairFilter } of DETECTORS) {
     pattern.lastIndex = 0;
-    for (const match of text.matchAll(pattern)) {
-      if (pairFilter && isStopwordPair(match[0])) continue;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match[0].length === 0) {
+        pattern.lastIndex += 1;
+        continue;
+      }
+      if (pairFilter) {
+        const verdict = classifyPair(match[0], text.slice(match.index + match[0].length, match.index + match[0].length + 6));
+        if (verdict === "not-a-name-first-word") {
+          // The first word is not a name; the second may start a real pair
+          // ("Call Ada Byron" → "Ada Byron"), so rescan from it.
+          pattern.lastIndex = match.index + match[0].split(/\s+/)[0].length;
+          continue;
+        }
+        if (verdict === "not-a-name") continue;
+      }
       raw.push({ type, start: match.index, end: match.index + match[0].length });
     }
   }
@@ -107,10 +138,22 @@ export function detectSpans(text: string): RedactionSpan[] {
 
 const HONORIFICS = new Set(["dr", "mr", "mrs", "ms", "mx", "prof", "professor"]);
 
-function isStopwordPair(match: string): boolean {
+type PairVerdict = "name" | "not-a-name-first-word" | "not-a-name";
+
+function classifyPair(match: string, following = ""): PairVerdict {
   const words = match.split(/\s+/).map((w) => w.toLowerCase().replace(/\.$/, ""));
-  if (words[0] !== undefined && NAME_PAIR_STOPWORDS.has(words[0])) return true;
+  if (words[0] !== undefined && (NAME_PAIR_STOPWORDS.has(words[0]) || LEADING_VERBS.has(words[0]))) {
+    return "not-a-name-first-word";
+  }
+  // "Dentist February 30", "Retreat September 12", "Appointment Thursday": a
+  // capitalized word followed by a weekday, or by a month and a day number, is
+  // a date phrase, not a surname (eval-v2, 2026-09-05). A month without a day
+  // number ("Theresa May") is still masked.
+  const last = words[words.length - 1];
+  if (last !== undefined && (WEEKDAYS.has(last) || (MONTHS.has(last) && /^\s+\d{1,2}(?!\d)/.test(following)))) {
+    return "not-a-name";
+  }
   // Pairs touching an honorific belong to the honorific detector, which also
   // captures the name that follows; matching them here splits the span.
-  return words.some((w) => HONORIFICS.has(w));
+  return words.some((w) => HONORIFICS.has(w)) ? "not-a-name" : "name";
 }
