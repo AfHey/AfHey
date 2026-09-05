@@ -8,6 +8,6 @@ setup("authenticate", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page).toHaveURL(/\/today$/);
   await page.context().storageState({ path: "playwright/.auth/user.json" });
 });

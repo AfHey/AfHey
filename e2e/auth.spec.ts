@@ -17,7 +17,7 @@ test("signs in and out", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Password").fill(PASSWORD!);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/tasks$/);
+  await expect(page).toHaveURL(/\/today$/);
 
   await page.goto("/settings");
   await page.getByRole("button", { name: "Sign out" }).click();

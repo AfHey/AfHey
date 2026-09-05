@@ -24,6 +24,12 @@ const ICONS: Record<string, React.ReactNode> = {
       <path d="M2 6.5h12M6 6.5v7.5M10 6.5v7.5M2 10h12" />
     </>
   ),
+  today: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 4.5V8l2.5 1.5" />
+    </>
+  ),
   projects: (
     <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2h4.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7Z" />
   ),
@@ -48,15 +54,17 @@ const ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
+// Final navigation is Phase 3b; the phone bar keeps the five daily screens.
 const ITEMS = [
-  { href: "/inbox", label: "Inbox", icon: "inbox" },
-  { href: "/calendar", label: "Calendar", icon: "calendar" },
-  { href: "/tasks", label: "Tasks", icon: "tasks" },
-  { href: "/events", label: "Events", icon: "events" },
-  { href: "/projects", label: "Projects", icon: "projects" },
-  { href: "/notes", label: "Notes", icon: "notes" },
-  { href: "/people", label: "People", icon: "people" },
-  { href: "/settings", label: "Settings", icon: "settings" },
+  { href: "/today", label: "Today", icon: "today", mobile: true },
+  { href: "/calendar", label: "Calendar", icon: "calendar", mobile: true },
+  { href: "/inbox", label: "Inbox", icon: "inbox", mobile: true },
+  { href: "/tasks", label: "Tasks", icon: "tasks", mobile: true },
+  { href: "/events", label: "Events", icon: "events", mobile: false },
+  { href: "/projects", label: "Projects", icon: "projects", mobile: false },
+  { href: "/notes", label: "Notes", icon: "notes", mobile: false },
+  { href: "/people", label: "People", icon: "people", mobile: false },
+  { href: "/settings", label: "Settings", icon: "settings", mobile: true },
 ] as const;
 
 export function Nav({ orientation }: { orientation: "vertical" | "horizontal" }) {
@@ -64,7 +72,7 @@ export function Nav({ orientation }: { orientation: "vertical" | "horizontal" })
   const vertical = orientation === "vertical";
   return (
     <ul className={vertical ? "flex flex-col gap-1" : "flex justify-around px-1 py-1.5"}>
-      {ITEMS.map((item) => {
+      {ITEMS.filter((item) => vertical || item.mobile).map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <li key={item.href}>

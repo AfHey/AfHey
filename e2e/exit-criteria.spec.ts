@@ -33,7 +33,8 @@ test("a reviewed batch survives a completely fresh session", async ({ page, brow
   await fresh.goto("/login");
   await fresh.getByLabel("Password").fill(process.env.AFHEY_E2E_PASSWORD!);
   await fresh.getByRole("button", { name: "Sign in" }).click();
-  await expect(fresh).toHaveURL(/\/tasks$/);
+  await expect(fresh).toHaveURL(/\/today$/);
+  await fresh.goto("/tasks");
   await expect(fresh.getByText(title)).toBeVisible();
   await expect(fresh.getByText(/Due .*Sep|Due .*Oct|Due .*Nov|Due .*Dec|Due .*Jan|Due .*Feb|Due .*Mar|Due .*Apr|Due .*May|Due .*Jun|Due .*Jul|Due .*Aug/).first()).toBeVisible();
   await fresh.goto("/notes");

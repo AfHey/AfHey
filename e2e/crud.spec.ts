@@ -47,6 +47,6 @@ test("mobile layout shows the bottom tab bar", async ({ page }) => {
   await page.goto("/tasks");
   const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav).toBeVisible();
-  await nav.getByRole("link", { name: "Projects" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await nav.getByRole("link", { name: "Calendar" }).click();
+  await expect(page).toHaveURL(/\/calendar$/);
 });
