@@ -1,11 +1,12 @@
 /**
- * Calendar view-model (Phase 2, Step 1). Pure mapping from stored Events to
- * what the calendar library draws. All date arithmetic here is Luxon in the
- * user's zone; the component receives finished strings and never computes.
+ * Calendar view-model (Phase 2, Steps 1 and 8). Pure mapping from stored
+ * Events and Tasks to what the calendar library draws. All date arithmetic
+ * here is Luxon in the user's zone; the component receives finished strings
+ * and never computes.
  */
 import { DateTime } from "luxon";
 import { dbToIsoDate } from "@/core/domain/time";
-import type { Event } from "@/db/generated/client";
+import type { Event, Task } from "@/db/generated/client";
 
 export type CalendarViewName = "timeGridDay" | "timeGridWeek";
 
@@ -21,8 +22,19 @@ export interface CalendarEventDto {
   scheduleType: Event["scheduleType"];
   isLocked: boolean;
   blockState: Event["blockState"];
+  taskId: string | null;
+  revision: number;
   /** Class names the library attaches to the event element (v7 event property `className`). */
   className: string[];
+}
+
+/** A task deadline drawn as a read-only all-day marker; never a stored Event (spec §9.2). */
+export interface DeadlineMarkerDto {
+  id: string;
+  taskId: string;
+  title: string;
+  date: string;
+  hard: boolean;
 }
 
 export function eventClassNames(event: Pick<Event, "kind" | "scheduleType" | "isLocked" | "blockState">): string[] {
@@ -30,6 +42,21 @@ export function eventClassNames(event: Pick<Event, "kind" | "scheduleType" | "is
   if (event.isLocked) classes.push("afhey-locked");
   if (event.blockState) classes.push(`afhey-block-${event.blockState}`);
   return classes;
+}
+
+/** Event colours by kind and state (the theme's own palette colours the rest). */
+export function eventColor(event: Pick<Event, "kind" | "blockState">): string | undefined {
+  if (event.kind !== "block") return undefined;
+  switch (event.blockState) {
+    case "in_progress":
+      return "#b45309";
+    case "missed_unconfirmed":
+      return "#be123c";
+    case "completed":
+      return "#6b7280";
+    default:
+      return "#0f766e";
+  }
 }
 
 /** Returns null for events the calendar cannot place (neither timed nor all-day). */
@@ -41,6 +68,8 @@ export function toCalendarEvent(event: Event): CalendarEventDto | null {
     scheduleType: event.scheduleType,
     isLocked: event.isLocked,
     blockState: event.blockState,
+    taskId: event.taskId,
+    revision: event.revision,
     className: eventClassNames(event),
   };
   if (event.startAt && event.endAt) {
@@ -55,6 +84,22 @@ export function toCalendarEvent(event: Event): CalendarEventDto | null {
     };
   }
   return null;
+}
+
+/** Open tasks' deadlines as calendar dates in the user's zone. */
+export function deadlineMarkers(tasks: Task[], zone: string): DeadlineMarkerDto[] {
+  const markers: DeadlineMarkerDto[] = [];
+  for (const task of tasks) {
+    if (task.status !== "open") continue;
+    const date = task.deadlineDate
+      ? dbToIsoDate(task.deadlineDate)
+      : task.deadlineAt
+        ? DateTime.fromJSDate(task.deadlineAt).setZone(task.deadlineTimezone ?? zone).toISODate()
+        : null;
+    if (!date) continue;
+    markers.push({ id: `deadline:${task.id}`, taskId: task.id, title: `Due: ${task.title}`, date, hard: task.deadlineType === "hard" });
+  }
+  return markers.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 
 /**

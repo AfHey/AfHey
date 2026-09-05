@@ -11,7 +11,7 @@ import { effectivePriority } from "@/core/domain/priority";
 import { loadSchedulerSettings, type SchedulerSettings } from "@/core/domain/scheduler-settings";
 import { dbToIsoDate, dbToTimeOfDay } from "@/core/domain/time";
 import { buildProposal, type DraftOperation, type ProposalWithOperations } from "@/core/proposals/build";
-import type { PrismaClient } from "@/db/generated/client";
+import type { Prisma, PrismaClient } from "@/db/generated/client";
 import { newUuid } from "@/lib/ids";
 import { deadlineInstant } from "./deadline";
 import { assessFeasibility, type Feasibility } from "./feasibility";
@@ -288,33 +288,7 @@ async function runScheduler(
           allowProtectedOverride: options.allowProtectedOverride,
         });
 
-  // Feasibility per in-scope task, from now to its deadline (bounded horizon).
-  const horizonEnd = nowMs + FEASIBILITY_HORIZON_DAYS * 24 * 60 * 60_000;
-  const horizonEvents = await db.event.findMany({
-    where: {
-      archivedAt: null,
-      startAt: { lt: new Date(horizonEnd) },
-      endAt: { gt: new Date(nowMs) },
-      OR: [{ kind: { not: "block" } }, { kind: "block", blockState: { in: ["planned", "in_progress"] }, OR: [{ scheduleType: "fixed" }, { isLocked: true }] }],
-    },
-  });
-  const horizonBusy = horizonEvents.filter((e) => e.startAt && e.endAt).map((e) => ({ start: e.startAt!.getTime(), end: e.endAt!.getTime() }));
-  const feasibility = tasks
-    .filter((t) => t.deadlineAt !== null)
-    .map((t) => {
-      const admitsJob = settings.preferences.jobTimePolicy === "any" || (settings.preferences.jobTimePolicy === "work_related_only" && t.domain === "work");
-      const free = freeTime(
-        { start: nowMs, end: Math.min(t.deadlineAt!, horizonEnd) },
-        {
-          zone,
-          availability: ctx.availability.filter((w) => w.kind === "general" || admitsJob),
-          protectedWindows: settings.protected,
-          busy: horizonBusy,
-          bufferMinutes: settings.preferences.bufferMinutes,
-        },
-      );
-      return { taskId: t.id, title: t.title, ...assessFeasibility({ status: "open", isSchedulable: true, remainingEstimateMinutes: t.remainingMinutes, deadlineAt: t.deadlineAt }, free, zone) };
-    });
+  const feasibility = await feasibilityReport(db, settings, now, tasks);
 
   return {
     operation: spec.operation,
@@ -329,5 +303,77 @@ async function runScheduler(
       estimateRequired,
       feasibility,
     },
+  };
+}
+
+/**
+ * Feasibility for tasks with a deadline (spec §7.1 item 2): eligible free
+ * time from now to the deadline (bounded horizon) against the remaining
+ * estimate. Shared by the scheduler summary and the Today screen.
+ */
+export async function feasibilityReport(
+  db: PrismaClient,
+  settings: SchedulerSettings,
+  now: DateTime,
+  tasks: PlanTask[],
+): Promise<Array<TaskLabel & Feasibility>> {
+  const zone = settings.timezone;
+  const nowMs = now.toMillis();
+  const horizonEnd = nowMs + FEASIBILITY_HORIZON_DAYS * 24 * 60 * 60_000;
+  const horizonEvents = await db.event.findMany({
+    where: {
+      archivedAt: null,
+      startAt: { lt: new Date(horizonEnd) },
+      endAt: { gt: new Date(nowMs) },
+      OR: [{ kind: { not: "block" } }, { kind: "block", blockState: { in: ["planned", "in_progress"] }, OR: [{ scheduleType: "fixed" }, { isLocked: true }] }],
+    },
+  });
+  const horizonBusy = horizonEvents.filter((e) => e.startAt && e.endAt).map((e) => ({ start: e.startAt!.getTime(), end: e.endAt!.getTime() }));
+  const availability = settings.availability.map((w) => ({ weekday: w.weekday, startTime: w.startTime, endTime: w.endTime, kind: w.kind }));
+  return tasks
+    .filter((t) => t.deadlineAt !== null)
+    .map((t) => {
+      const admitsJob = settings.preferences.jobTimePolicy === "any" || (settings.preferences.jobTimePolicy === "work_related_only" && t.domain === "work");
+      const free = freeTime(
+        { start: nowMs, end: Math.min(t.deadlineAt!, horizonEnd) },
+        { zone, availability: availability.filter((w) => w.kind === "general" || admitsJob), protectedWindows: settings.protected, busy: horizonBusy, bufferMinutes: settings.preferences.bufferMinutes },
+      );
+      return { taskId: t.id, title: t.title, ...assessFeasibility({ status: "open", isSchedulable: true, remainingEstimateMinutes: t.remainingMinutes, deadlineAt: t.deadlineAt }, free, zone) };
+    });
+}
+
+/** The scheduler's view of the open, active, schedulable tasks with estimates (shared with Today). */
+export async function loadPlanTasks(db: PrismaClient, zone: string): Promise<{ tasks: PlanTask[]; estimateRequired: TaskLabel[] }> {
+  const rows = await db.task.findMany({
+    where: { status: "open", bucket: "active", isSchedulable: true, archivedAt: null },
+    include: { project: { include: { parent: true } } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  return {
+    estimateRequired: rows.filter((t) => t.remainingEstimateMinutes === null).map((t) => ({ taskId: t.id, title: t.title })),
+    tasks: rows.filter((t) => t.remainingEstimateMinutes !== null).map((t) => toPlanTask(t, zone)),
+  };
+}
+
+type TaskWithProject = Prisma.TaskGetPayload<{ include: { project: { include: { parent: true } } } }>;
+
+function toPlanTask(t: TaskWithProject, zone: string): PlanTask {
+  return {
+    id: t.id,
+    title: t.title,
+    remainingMinutes: t.remainingEstimateMinutes!,
+    isSplittable: t.isSplittable,
+    workType: t.workType,
+    domain: t.project?.kind === "area" ? t.project.domain : (t.project?.parent?.domain ?? null),
+    deadlineAt: deadlineInstant(t, zone)?.toMillis() ?? null,
+    deadlineType: t.deadlineType,
+    earliestStart: t.earliestStartDate ? dayStart(dbToIsoDate(t.earliestStartDate), zone).toMillis() : null,
+    preferredWindow:
+      t.preferredWindowStartTime && t.preferredWindowEndTime
+        ? { startTime: dbToTimeOfDay(t.preferredWindowStartTime), endTime: dbToTimeOfDay(t.preferredWindowEndTime) }
+        : null,
+    effectivePriority: effectivePriority(t.userPriority, t.computedPriorityScore),
+    score: t.computedPriorityScore,
+    createdAt: t.createdAt.getTime(),
   };
 }

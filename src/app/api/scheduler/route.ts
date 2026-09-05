@@ -28,7 +28,10 @@ export const POST = withAuth(async (request) => {
           : input.operation === "reschedule_day"
             ? await rescheduleDay(db, input.date, options)
             : await rollOver(db, { from: input.from ?? input.date, into: input.date }, options);
-    return Response.json(run);
+    // Titles for update operations (moves, cancels), whose payloads carry none.
+    const updateIds = (run.proposal?.operations ?? []).filter((o) => o.op !== "create").map((o) => o.entityId);
+    const rows = updateIds.length ? await db.event.findMany({ where: { id: { in: updateIds } }, select: { id: true, title: true } }) : [];
+    return Response.json({ ...run, labels: Object.fromEntries(rows.map((r) => [r.id, r.title])) });
   } catch (error) {
     if (error instanceof ProposalValidationError) return Response.json({ error: error.message, problems: error.problems }, { status: 422 });
     throw error;

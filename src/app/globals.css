@@ -90,3 +90,11 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Calendar (Phase 2): block states and derived deadline markers. */
+.afhey-calendar .afhey-flexible { border-style: dashed; }
+.afhey-calendar .afhey-block-missed_unconfirmed {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.35) 6px 8px);
+}
+.afhey-calendar .afhey-block-completed { opacity: 0.6; }
+.afhey-calendar .afhey-deadline { font-style: italic; }
