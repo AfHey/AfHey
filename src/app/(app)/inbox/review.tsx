@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DateTime } from "luxon";
 import { apiSend } from "@/lib/api";
+import { TimezoneSelect } from "../tasks/task-form";
+import { applyEdit, editorStateFrom, type EditableEntityType, type EditorState } from "./edit-payload";
 import { selectDisplayEvidence } from "./evidence-display";
 import type { CaptureView, InboxOptions, OperationView, ProposalView } from "./types";
 
@@ -48,29 +50,39 @@ function useAction() {
 function ItemMeta({ op, options }: { op: OperationView; options: InboxOptions }) {
   const a = op.after;
   const chips: string[] = [];
+  const personName = (id: unknown) =>
+    typeof id === "string" ? options.people.find((p) => p.id === id)?.name ?? "new person" : null;
   if (op.entityType === "task") {
     if (a.taskKind === "waiting_for") chips.push("Waiting for");
     if (a.taskKind === "reminder") chips.push("Reminder");
-    if (typeof a.deadlineDate === "string") chips.push(`Due ${a.deadlineDate}`);
+    if (typeof a.deadlineDate === "string") chips.push(`Due ${a.deadlineDate}${a.deadlineType === "hard" ? " (hard)" : ""}`);
     if (typeof a.deadlineAt === "string") {
-      chips.push(`Due ${DateTime.fromISO(a.deadlineAt).setZone(options.timezone).toFormat("ccc, LLL d, HH:mm")}`);
+      chips.push(
+        `Due ${DateTime.fromISO(a.deadlineAt).setZone(String(a.deadlineTimezone ?? options.timezone)).toFormat("ccc, LLL d, HH:mm")}${a.deadlineType === "hard" ? " (hard)" : ""}`,
+      );
+    }
+    if (typeof a.remindAt === "string") {
+      chips.push(`Remind ${DateTime.fromISO(a.remindAt).setZone(String(a.reminderTimezone ?? options.timezone)).toFormat("ccc, LLL d, HH:mm")}`);
     }
     if (typeof a.estimatedDurationMinutes === "number") chips.push(`${a.estimatedDurationMinutes} min`);
-    const people = Array.isArray(a.peopleIds) ? (a.peopleIds as string[]) : [];
-    for (const id of people) {
-      const name = options.people.find((p) => p.id === id)?.name;
-      chips.push(name ?? "new person");
-    }
-    if (typeof a.waitingForPersonId === "string") {
-      chips.push(options.people.find((p) => p.id === a.waitingForPersonId)?.name ?? "new person");
-    }
+    for (const id of Array.isArray(a.peopleIds) ? (a.peopleIds as string[]) : []) chips.push(personName(id)!);
+    const waiting = personName(a.waitingForPersonId);
+    if (waiting) chips.push(waiting);
   }
   if (op.entityType === "event") {
-    if (typeof a.startAt === "string") {
-      chips.push(DateTime.fromISO(a.startAt).setZone(String(a.timezone ?? options.timezone)).toFormat("ccc, LLL d, HH:mm"));
+    const zone = String(a.timezone ?? options.timezone);
+    if (typeof a.startAt === "string" && typeof a.endAt === "string") {
+      const s = DateTime.fromISO(a.startAt).setZone(zone);
+      const e = DateTime.fromISO(a.endAt).setZone(zone);
+      chips.push(`${s.toFormat("ccc, LLL d, HH:mm")}–${e.toFormat("HH:mm")}${zone !== options.timezone ? ` ${zone}` : ""}`);
     }
-    if (typeof a.allDayStartDate === "string") chips.push(`${a.allDayStartDate} · all day`);
+    if (typeof a.allDayStartDate === "string" && typeof a.allDayEndDate === "string") {
+      const last = DateTime.fromISO(a.allDayEndDate).minus({ days: 1 }).toISODate();
+      chips.push(last === a.allDayStartDate ? `${a.allDayStartDate} · all day` : `${a.allDayStartDate} → ${last} · all day`);
+    }
     if (typeof a.kind === "string") chips.push(String(a.kind));
+    if (a.isLocked === true) chips.push("Pinned");
+    for (const id of Array.isArray(a.peopleIds) ? (a.peopleIds as string[]) : []) chips.push(personName(id)!);
   }
   if (typeof a.projectId === "string") {
     chips.push(options.projects.find((p) => p.id === a.projectId)?.name ?? "new project");
@@ -104,111 +116,13 @@ function Evidence({ op, sourceExpired }: { op: OperationView; sourceExpired: boo
 
 // --- Item editor ---------------------------------------------------------
 
-interface EditorState {
-  entityType: EntityType;
-  title: string;
-  body: string;
-  role: string;
-  taskKind: "action" | "waiting_for" | "reminder";
-  projectId: string;
-  waitingForPersonId: string;
-  deadlineDate: string;
-  remindLocal: string;
-  estimated: string;
-  notes: string;
-  eventKind: "meeting" | "appointment" | "personal" | "other";
-  scheduleType: "fixed" | "flexible";
-  allDay: boolean;
-  startLocal: string;
-  endLocal: string;
-  allDayStart: string;
-}
-
-function toEditor(op: OperationView, zone: string): EditorState {
-  const a = op.after;
-  const local = (iso: unknown) =>
-    typeof iso === "string" ? DateTime.fromISO(iso).setZone(zone).toFormat("yyyy-MM-dd'T'HH:mm") : "";
-  return {
-    entityType: op.entityType,
-    title: String(a.title ?? a.name ?? ""),
-    body: String(a.body ?? ""),
-    role: String(a.role ?? ""),
-    taskKind: (a.taskKind as EditorState["taskKind"]) ?? "action",
-    projectId: typeof a.projectId === "string" ? a.projectId : "",
-    waitingForPersonId: typeof a.waitingForPersonId === "string" ? a.waitingForPersonId : "",
-    deadlineDate: typeof a.deadlineDate === "string" ? a.deadlineDate : "",
-    remindLocal: local(a.remindAt),
-    estimated: typeof a.estimatedDurationMinutes === "number" ? String(a.estimatedDurationMinutes) : "",
-    notes: String(a.notes ?? ""),
-    eventKind: (a.kind as EditorState["eventKind"]) ?? "other",
-    scheduleType: (a.scheduleType as EditorState["scheduleType"]) ?? "fixed",
-    allDay: typeof a.allDayStartDate === "string" || typeof a.startAt !== "string",
-    startLocal: local(a.startAt),
-    endLocal: local(a.endAt),
-    allDayStart: typeof a.allDayStartDate === "string" ? a.allDayStartDate : DateTime.now().setZone(zone).toISODate()!,
-  };
-}
-
-function fromEditor(s: EditorState, original: Record<string, unknown>, zone: string): Record<string, unknown> {
-  const keep = (key: string) => (original[key] === undefined ? {} : { [key]: original[key] });
-  const instant = (localValue: string) => {
-    const dt = DateTime.fromISO(localValue, { zone });
-    return dt.isValid ? dt.toUTC().toISO() : null;
-  };
-  switch (s.entityType) {
-    case "task":
-      return {
-        ...keep("captureId"),
-        ...keep("peopleIds"),
-        ...keep("description"),
-        ...keep("location"),
-        title: s.title,
-        notes: s.notes.trim() || null,
-        taskKind: s.taskKind,
-        projectId: s.projectId || null,
-        waitingForPersonId: s.taskKind === "waiting_for" ? s.waitingForPersonId || null : null,
-        deadlineDate: s.taskKind !== "reminder" && s.deadlineDate ? s.deadlineDate : null,
-        deadlineType: s.taskKind !== "reminder" && s.deadlineDate ? (original.deadlineType ?? "soft") : null,
-        deadlineAt: null,
-        deadlineTimezone: null,
-        remindAt: s.taskKind === "reminder" ? instant(s.remindLocal) : null,
-        reminderTimezone: s.taskKind === "reminder" && s.remindLocal ? zone : null,
-        estimatedDurationMinutes: s.estimated ? Number(s.estimated) : null,
-      };
-    case "event": {
-      const start = s.allDay ? null : instant(s.startLocal);
-      const end = s.allDay ? null : instant(s.endLocal);
-      return {
-        ...keep("captureId"),
-        ...keep("description"),
-        ...keep("location"),
-        title: s.title,
-        kind: s.eventKind,
-        scheduleType: s.scheduleType,
-        isLocked: false,
-        timezone: zone,
-        projectId: s.projectId || null,
-        notes: s.notes.trim() || null,
-        startAt: start,
-        endAt: end,
-        allDayStartDate: s.allDay ? s.allDayStart : null,
-        allDayEndDate: s.allDay
-          ? DateTime.fromISO(s.allDayStart, { zone }).plus({ days: 1 }).toISODate()
-          : null,
-      };
-    }
-    case "note":
-      return {
-        ...keep("captureId"),
-        body: s.body || s.title,
-        title: s.body ? s.title.trim() || null : null,
-        projectId: s.projectId || null,
-      };
-    case "person":
-      return { name: s.title, role: s.role.trim() || null, notes: s.notes.trim() || null, aliases: [] };
-    case "project":
-      return { kind: "project", name: s.title, parentId: null, description: s.notes.trim() || null, importance: null };
-  }
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="label">{label}</span>
+      {children}
+    </label>
+  );
 }
 
 function ItemEditor({
@@ -220,31 +134,33 @@ function ItemEditor({
 }: {
   op: OperationView;
   options: InboxOptions;
-  onSave: (entityType: EntityType, after: Record<string, unknown>) => void;
+  onSave: (entityType: EditableEntityType, after: Record<string, unknown>) => void;
   onCancel: () => void;
   busy: boolean;
 }) {
-  const [s, setS] = useState<EditorState>(() => toEditor(op, options.timezone));
+  const [initial] = useState<EditorState>(() => editorStateFrom(op.entityType, op.after, options.timezone));
+  const [s, setS] = useState<EditorState>(initial);
   const set = <K extends keyof EditorState>(key: K, value: EditorState[K]) =>
     setS((prev) => ({ ...prev, [key]: value }));
   const convertible = op.entityType === "task" || op.entityType === "event" || op.entityType === "note";
+  const named = s.entityType === "person" || s.entityType === "project";
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(s.entityType, fromEditor(s, op.after, options.timezone));
+        const result = applyEdit(op.after, initial, s);
+        onSave(result.entityType, result.after);
       }}
       className="mt-3 flex flex-col gap-3 rounded-lg border border-line bg-paper p-3"
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {convertible ? (
-          <label className="flex flex-col gap-1">
-            <span className="label">Save as</span>
+          <Field label="Save as">
             <select
               value={s.entityType}
               onChange={(e) => {
-                const next = e.target.value as EntityType;
+                const next = e.target.value as EditableEntityType;
                 setS((prev) => ({
                   ...prev,
                   entityType: next,
@@ -258,124 +174,185 @@ function ItemEditor({
               <option value="event">Event</option>
               <option value="note">Note</option>
             </select>
-          </label>
+          </Field>
         ) : null}
         <label className="col-span-2 flex flex-col gap-1">
-          <span className="label">{s.entityType === "person" || s.entityType === "project" ? "Name" : "Title"}</span>
+          <span className="label">{named ? "Name" : "Title"}</span>
           <input value={s.title} onChange={(e) => set("title", e.target.value)} required={s.entityType !== "note"} className="input" />
         </label>
       </div>
 
       {s.entityType === "note" ? (
-        <label className="flex flex-col gap-1">
-          <span className="label">Note</span>
+        <Field label="Note">
           <textarea value={s.body} onChange={(e) => set("body", e.target.value)} rows={3} required className="input" />
-        </label>
+        </Field>
       ) : null}
 
       {s.entityType === "task" ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="flex flex-col gap-1">
-            <span className="label">Kind</span>
-            <select value={s.taskKind} onChange={(e) => set("taskKind", e.target.value as EditorState["taskKind"])} className="input">
-              <option value="action">Action</option>
-              <option value="waiting_for">Waiting for</option>
-              <option value="reminder">Reminder</option>
-            </select>
-          </label>
-          {s.taskKind === "waiting_for" ? (
-            <label className="flex flex-col gap-1">
-              <span className="label">Waiting on</span>
-              <select value={s.waitingForPersonId} onChange={(e) => set("waitingForPersonId", e.target.value)} required className="input">
-                <option value="">Choose…</option>
-                {options.people.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Kind">
+              <select value={s.taskKind} onChange={(e) => set("taskKind", e.target.value as EditorState["taskKind"])} className="input">
+                <option value="action">Action</option>
+                <option value="waiting_for">Waiting for</option>
+                <option value="reminder">Reminder</option>
               </select>
-            </label>
-          ) : null}
+            </Field>
+            <Field label="Bucket">
+              <select value={s.bucket} onChange={(e) => set("bucket", e.target.value as EditorState["bucket"])} className="input">
+                <option value="active">Active</option>
+                <option value="backlog">Backlog</option>
+                <option value="someday">Someday</option>
+              </select>
+            </Field>
+            {s.taskKind === "waiting_for" ? (
+              <Field label="Waiting on">
+                <select value={s.waitingForPersonId} onChange={(e) => set("waitingForPersonId", e.target.value)} required className="input">
+                  <option value="">Choose…</option>
+                  {options.people.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+            <Field label="Estimate (min)">
+              <input type="number" min={1} value={s.estimated} onChange={(e) => set("estimated", e.target.value)} className="input" />
+            </Field>
+          </div>
           {s.taskKind === "reminder" ? (
-            <label className="flex flex-col gap-1">
-              <span className="label">Remind at</span>
-              <input type="datetime-local" value={s.remindLocal} onChange={(e) => set("remindLocal", e.target.value)} required className="input" />
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Remind at">
+                <input type="datetime-local" value={s.remindLocal} onChange={(e) => set("remindLocal", e.target.value)} required className="input" />
+              </Field>
+              <TimezoneSelect label="Reminder timezone" value={s.remindTimezone} onChange={(v) => set("remindTimezone", v)} />
+            </div>
           ) : (
-            <label className="flex flex-col gap-1">
-              <span className="label">Deadline</span>
-              <input type="date" value={s.deadlineDate} onChange={(e) => set("deadlineDate", e.target.value)} className="input" />
-            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="Deadline">
+                <select value={s.deadlineMode} onChange={(e) => set("deadlineMode", e.target.value as EditorState["deadlineMode"])} className="input">
+                  <option value="none">None</option>
+                  <option value="date">On a date</option>
+                  <option value="instant">At a time</option>
+                </select>
+              </Field>
+              {s.deadlineMode === "date" ? (
+                <Field label="Date">
+                  <input type="date" value={s.deadlineDate} onChange={(e) => set("deadlineDate", e.target.value)} required className="input" />
+                </Field>
+              ) : null}
+              {s.deadlineMode === "instant" ? (
+                <>
+                  <Field label="When">
+                    <input type="datetime-local" value={s.deadlineLocal} onChange={(e) => set("deadlineLocal", e.target.value)} required className="input" />
+                  </Field>
+                  <TimezoneSelect label="Timezone" value={s.deadlineTimezone} onChange={(v) => set("deadlineTimezone", v)} />
+                </>
+              ) : null}
+              {s.deadlineMode !== "none" ? (
+                <Field label="Firmness">
+                  <select value={s.deadlineType} onChange={(e) => set("deadlineType", e.target.value as "hard" | "soft")} className="input">
+                    <option value="soft">Soft</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </Field>
+              ) : null}
+            </div>
           )}
-          <label className="flex flex-col gap-1">
-            <span className="label">Estimate (min)</span>
-            <input type="number" min={1} value={s.estimated} onChange={(e) => set("estimated", e.target.value)} className="input" />
-          </label>
-        </div>
+        </>
       ) : null}
 
       {s.entityType === "event" ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="flex flex-col gap-1">
-            <span className="label">Kind</span>
-            <select value={s.eventKind} onChange={(e) => set("eventKind", e.target.value as EditorState["eventKind"])} className="input">
-              <option value="meeting">Meeting</option>
-              <option value="appointment">Appointment</option>
-              <option value="personal">Personal</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="label">Timing</span>
-            <select value={s.scheduleType} onChange={(e) => set("scheduleType", e.target.value as EditorState["scheduleType"])} className="input">
-              <option value="fixed">Fixed</option>
-              <option value="flexible">Flexible</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2 pt-5 text-sm">
-            <input type="checkbox" checked={s.allDay} onChange={(e) => set("allDay", e.target.checked)} />
-            All-day
-          </label>
-          {s.allDay ? (
-            <label className="flex flex-col gap-1">
-              <span className="label">Day</span>
-              <input type="date" value={s.allDayStart} onChange={(e) => set("allDayStart", e.target.value)} required className="input" />
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Kind">
+              <select value={s.eventKind} onChange={(e) => set("eventKind", e.target.value as EditorState["eventKind"])} className="input">
+                <option value="meeting">Meeting</option>
+                <option value="appointment">Appointment</option>
+                <option value="personal">Personal</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+            <Field label="Timing">
+              <select value={s.scheduleType} onChange={(e) => set("scheduleType", e.target.value as EditorState["scheduleType"])} className="input">
+                <option value="fixed">Fixed</option>
+                <option value="flexible">Flexible</option>
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 pt-5 text-sm">
+              <input type="checkbox" checked={s.allDay} onChange={(e) => set("allDay", e.target.checked)} />
+              All-day
             </label>
-          ) : (
-            <>
-              <label className="flex flex-col gap-1">
-                <span className="label">Starts</span>
-                <input type="datetime-local" value={s.startLocal} onChange={(e) => set("startLocal", e.target.value)} required className="input" />
+            {s.scheduleType === "flexible" ? (
+              <label className="flex items-center gap-2 pt-5 text-sm">
+                <input type="checkbox" checked={s.isLocked} onChange={(e) => set("isLocked", e.target.checked)} />
+                Pinned
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="label">Ends</span>
-                <input type="datetime-local" value={s.endLocal} onChange={(e) => set("endLocal", e.target.value)} required className="input" />
-              </label>
-            </>
-          )}
-        </div>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {s.allDay ? (
+              <>
+                <Field label="First day">
+                  <input type="date" value={s.allDayStart} onChange={(e) => set("allDayStart", e.target.value)} required className="input" />
+                </Field>
+                <Field label="Last day">
+                  <input type="date" value={s.allDayLastDay} onChange={(e) => set("allDayLastDay", e.target.value)} required className="input" />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field label="Starts">
+                  <input type="datetime-local" value={s.startLocal} onChange={(e) => set("startLocal", e.target.value)} required className="input" />
+                </Field>
+                <Field label="Ends">
+                  <input type="datetime-local" value={s.endLocal} onChange={(e) => set("endLocal", e.target.value)} required className="input" />
+                </Field>
+              </>
+            )}
+            <TimezoneSelect label="Timezone" value={s.timezone} onChange={(v) => set("timezone", v)} />
+          </div>
+        </>
       ) : null}
 
       {s.entityType !== "person" && s.entityType !== "note" ? (
-        <label className="flex flex-col gap-1">
-          <span className="label">Project</span>
+        <Field label="Project">
           <select value={s.projectId} onChange={(e) => set("projectId", e.target.value)} className="input">
             <option value="">None</option>
             {options.projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-        </label>
+        </Field>
+      ) : null}
+      {s.entityType === "note" ? (
+        <Field label="Project">
+          <select value={s.projectId} onChange={(e) => set("projectId", e.target.value)} className="input">
+            <option value="">None</option>
+            {options.projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </Field>
       ) : null}
       {s.entityType === "person" ? (
-        <label className="flex flex-col gap-1">
-          <span className="label">Role</span>
+        <Field label="Role">
           <input value={s.role} onChange={(e) => set("role", e.target.value)} className="input" />
-        </label>
+        </Field>
+      ) : null}
+      {s.entityType === "task" || s.entityType === "event" ? (
+        <Field label="Location">
+          <input value={s.location} onChange={(e) => set("location", e.target.value)} className="input" />
+        </Field>
       ) : null}
       {s.entityType !== "note" ? (
-        <label className="flex flex-col gap-1">
-          <span className="label">{s.entityType === "project" ? "Description" : "Notes"}</span>
-          <textarea value={s.notes} onChange={(e) => set("notes", e.target.value)} rows={2} className="input" />
-        </label>
+        <Field label={s.entityType === "project" ? "Description" : "Notes"}>
+          <textarea
+            value={s.entityType === "project" ? s.description : s.notes}
+            onChange={(e) => set(s.entityType === "project" ? "description" : "notes", e.target.value)}
+            rows={2}
+            className="input"
+          />
+        </Field>
       ) : null}
 
       <div className="flex gap-2">
@@ -431,6 +408,7 @@ function ReviewProposal({ capture, proposal, options }: { capture: CaptureView; 
       (r) => {
         if (r.outcome === "conflicted") setResult(`Not applied — ${r.details?.map((d) => d.reason).join("; ")}`);
         if (r.outcome === "failed") setResult(`Not applied — ${r.reason}`);
+        if (r.outcome === "in_progress") setResult("Still applying — refresh in a moment.");
       },
     );
   const rejectAll = () => run(() => apiSend(`/api/proposals/${proposal.id}/reject`, "POST", { rejectCapture: true }));
