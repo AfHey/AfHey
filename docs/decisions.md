@@ -166,6 +166,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: fixed one-hour fold detection; ignoring zone text; treating all durations as elapsed minutes; letting an invalid component fall back to "absent".
 - Reason: each rejected shortcut produced a confidently wrong date in the review's reproductions; the spec forbids silent strong assumptions.
 
+## 2026-09-05 Event ends, ranges, and deadline firmness (findings 20, 21)
+- Decision: a range inside an event's start phrase ("Sept 12–14", "9am–11am", "September 12 through September 14") is resolved as one range; a separate end phrase resolves relative to the start's day; an explicit end that cannot be used (missing, before the start) is never replaced silently — the end is set provisionally to one hour after the start and the item is flagged `needs_confirmation`. Multi-day all-day events keep their explicit last day (stored as an exclusive end). Deadline firmness comes from the new provider field `deadline_type` (hard | soft | null; prompt `p4-2026-09-05`), else from explicit wording ("hard deadline", "no later than", "at the latest", "final deadline"), else defaults to `soft`.
+- Rejected: inventing a one-hour end when the text gave one; collapsing ranges to a single day; treating every extracted deadline as soft.
+- Reason: an end or a firmness the user wrote is data the review must preserve; a default is only acceptable where the text is silent, and even then it is labeled.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

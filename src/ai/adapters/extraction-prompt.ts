@@ -7,7 +7,7 @@
 import type { ExtractionInput } from "./types";
 
 export const EXTRACTION_MODEL = "gpt-5.4-mini-2026-03-17";
-export const PROMPT_VERSION = "p3-2026-09-05";
+export const PROMPT_VERSION = "p4-2026-09-05";
 
 export const SYSTEM_PROMPT = `You are the extraction component of a personal task manager. You read one captured text and return structured candidate items (tasks, events, notes, and proposed people/projects) as JSON matching the provided schema. Follow these rules exactly:
 
@@ -18,7 +18,7 @@ export const SYSTEM_PROMPT = `You are the extraction component of a personal tas
 4. Entities: tokens like [PERSON_1] or [PROJECT_1] are opaque placeholders for known records. The RESOLUTION CONTEXT lists each placeholder's candidate id(s). Reference them via entity_references using ONLY those candidate ids (field "project_id" for a task/event/note's project, field "people" for involved persons, field "waiting_for_person_id" for who owes the user). Never invent ids. A name that has no placeholder is unknown: either set unresolved_literal, or add a separate person/project item (entity_type "person"/"project") and reference it via depends_on_item_refs.
 5. Tokens like [REDACTED_...] are removed sensitive content. Never guess what they contain.
 6. Item kinds: a to-do is entity_type "task" (fields.task_kind "action"); something another person owes the user is task_kind "waiting_for"; a pure time-based nudge is task_kind "reminder". A scheduled commitment with other people or a fixed time is an "event" (fields.event_kind meeting | appointment | personal | other; never a block). Reference material is a "note".
-7. fields may include: title, body, name, description, notes, location, context, task_kind, bucket, event_kind, schedule_type, all_day, estimated_duration_minutes, is_splittable, is_schedulable, energy_level, work_type, proposed_priority_score, role. Use null for anything not present in the capture. Do not fabricate values. "context" means situational context only (a place, tool, or mode such as "at the office" or "needs laptop") — never a date, time, or person. Enum fields (task_kind, bucket, event_kind, schedule_type, energy_level, work_type) take only their listed values or null; work_type is a category (deep | shallow | study | communication | errand | other), never a restatement of the title.
+7. fields may include: title, body, name, description, notes, location, context, task_kind, bucket, deadline_type, event_kind, schedule_type, all_day, estimated_duration_minutes, is_splittable, is_schedulable, energy_level, work_type, proposed_priority_score, role. deadline_type is "hard" when the text marks the date as firm ("hard deadline", "no later than", "must be submitted by", "final"), "soft" when it is aspirational ("ideally", "try to", "aim for"), otherwise null. For an event whose text gives an end ("9am–11am", "until 4pm", "through the 14th"), emit a second temporal_expressions entry with field "end". Use null for anything not present in the capture. Do not fabricate values. "context" means situational context only (a place, tool, or mode such as "at the office" or "needs laptop") — never a date, time, or person. Enum fields (task_kind, bucket, event_kind, schedule_type, energy_level, work_type) take only their listed values or null; work_type is a category (deep | shallow | study | communication | errand | other), never a restatement of the title.
 8. item_ref values are "item-1", "item-2", ... unique within this response. Use depends_on_item_refs only for references to other items in this response.
 9. Confidence per §evidence: "high" when explicit, "medium" when inferred, "needs_confirmation" when ambiguous (including ambiguous placeholder candidates marked ambiguous in the resolution context).
 10. If the capture contains nothing actionable, return an empty items array.`;
@@ -88,6 +88,7 @@ export const EXTRACTION_JSON_SCHEMA = {
               context: nullable("string"),
               task_kind: { type: ["string", "null"], enum: ["action", "waiting_for", "reminder", null] },
               bucket: { type: ["string", "null"], enum: ["active", "backlog", "someday", null] },
+              deadline_type: { type: ["string", "null"], enum: ["hard", "soft", null] },
               event_kind: {
                 type: ["string", "null"],
                 enum: ["meeting", "appointment", "personal", "other", null],
@@ -107,7 +108,7 @@ export const EXTRACTION_JSON_SCHEMA = {
             },
             required: [
               "title", "body", "name", "description", "notes", "location", "context",
-              "task_kind", "bucket", "event_kind", "schedule_type", "all_day",
+              "task_kind", "bucket", "deadline_type", "event_kind", "schedule_type", "all_day",
               "estimated_duration_minutes", "is_splittable", "is_schedulable",
               "energy_level", "work_type", "proposed_priority_score", "role",
             ],

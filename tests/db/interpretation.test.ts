@@ -416,6 +416,65 @@ describe("interpretExtraction", () => {
     expect(outcome.warnings.some((w) => /kept as a task/.test(w.message))).toBe(true);
   });
 
+  it("keeps explicit event ends and multi-day ranges, never inventing a duration (finding 20)", async () => {
+    const payload = "Meet on September 12, 9am–11am; retreat September 12 through September 14 inclusive, all day; sync Friday 4pm ending 3pm";
+    const capture = await newCapture(payload);
+    const t = (field: string, literal: string, confidence: "high" | "medium" = "high") => {
+      const start = payload.indexOf(literal);
+      return { field, literal, relation: "on" as const, anchor_entity_id: null, evidence: evidence(start, start + literal.length), confidence };
+    };
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({ item_ref: "item-1", entity_type: "event", fields: { title: "Meet", event_kind: "meeting" }, temporal_expressions: [t("start", "September 12, 9am–11am")], field_evidence: [{ field: "title", evidence: evidence(0, 4), confidence: "high" }] }),
+        item({ item_ref: "item-2", entity_type: "event", fields: { title: "retreat", event_kind: "personal", all_day: true }, temporal_expressions: [t("start", "September 12 through September 14")], field_evidence: [{ field: "title", evidence: evidence(payload.indexOf("retreat"), payload.indexOf("retreat") + 7), confidence: "high" }] }),
+        item({ item_ref: "item-3", entity_type: "event", fields: { title: "sync", event_kind: "meeting" }, temporal_expressions: [t("start", "Friday 4pm"), t("end", "3pm")], field_evidence: [{ field: "title", evidence: evidence(payload.indexOf("sync"), payload.indexOf("sync") + 4), confidence: "high" }] }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const [meet, retreat, sync] = outcome.proposal!.operations.map((o) => o.after as Record<string, unknown>);
+    expect(meet).toMatchObject({ startAt: "2026-09-12T13:00:00.000Z", endAt: "2026-09-12T15:00:00.000Z" });
+    expect(retreat).toMatchObject({ allDayStartDate: "2026-09-12", allDayEndDate: "2026-09-15" });
+    // An explicit end before the start is not used silently.
+    expect(sync.startAt).toBe("2026-09-04T20:00:00.000Z");
+    expect(sync.endAt).toBe("2026-09-04T21:00:00.000Z");
+    // Events carry no confidence column (spec §9.2); the review sees the
+    // needs_confirmation warning on the operation instead.
+    const syncOp = outcome.proposal!.operations[2];
+    expect(syncOp.reason).toMatch(/stated end could not be used/);
+    expect(outcome.warnings.some((w) => w.itemRef === "item-3" && w.severity === "needs_confirmation" && /stated end could not be used/.test(w.message))).toBe(true);
+  });
+
+  it("persists deadline firmness from the provider field or the wording (finding 21)", async () => {
+    const payload = "submit the grant report — hard deadline 2026-11-30; draft the memo by Friday; file the form 2026-10-01";
+    const capture = await newCapture(payload);
+    const at = (literal: string) => {
+      const start = payload.indexOf(literal);
+      return evidence(start, start + literal.length);
+    };
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({ item_ref: "item-1", entity_type: "task", fields: { title: "submit the grant report" }, temporal_expressions: [{ field: "deadline", literal: "hard deadline 2026-11-30", relation: "before", anchor_entity_id: null, evidence: at("hard deadline 2026-11-30"), confidence: "high" }], field_evidence: [{ field: "title", evidence: at("submit the grant report"), confidence: "high" }] }),
+        item({ item_ref: "item-2", entity_type: "task", fields: { title: "draft the memo", deadline_type: "soft" }, temporal_expressions: [{ field: "deadline", literal: "by Friday", relation: "before", anchor_entity_id: null, evidence: at("by Friday"), confidence: "high" }], field_evidence: [{ field: "title", evidence: at("draft the memo"), confidence: "high" }] }),
+        item({ item_ref: "item-3", entity_type: "task", fields: { title: "file the form", deadline_type: "hard" }, temporal_expressions: [{ field: "deadline", literal: "2026-10-01", relation: "on", anchor_entity_id: null, evidence: at("2026-10-01"), confidence: "high" }], field_evidence: [{ field: "title", evidence: at("file the form"), confidence: "high" }] }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const types = outcome.proposal!.operations.map((o) => (o.after as { deadlineType: string; deadlineDate: string }));
+    expect(types.map((p) => [p.deadlineDate, p.deadlineType])).toEqual([
+      ["2026-11-30", "hard"],
+      ["2026-09-04", "soft"],
+      ["2026-10-01", "hard"],
+    ]);
+  });
+
   it("warns about likely duplicates of open tasks", async () => {
     await db.task.create({ data: { title: "Order backsplash tile" } });
     const payload = "order backsplash tile";

@@ -6,7 +6,7 @@
  * resolution, business invariants, duplicate warnings, and FieldEvidence.
  * Nothing here is saved to domain tables; only the Proposal is persisted.
  */
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import type { ExtractionItem, ExtractionResult } from "@/ai/adapters/extraction-contract";
 import type { ResolutionMention } from "@/ai/adapters/types";
 import type { Confidence } from "@/core/domain/enums";
@@ -23,7 +23,13 @@ import { newUuid } from "@/lib/ids";
 import type { Prisma, PrismaClient } from "@/db/generated/client";
 import { findDuplicates, type DuplicateCandidate, type DuplicateWarning } from "./duplicates";
 import { fieldEvidenceIsMeaningful } from "./evidence-fields";
-import { detectTemporalPhrases, resolveTemporal, type TemporalResolution } from "./temporal";
+import {
+  detectTemporalPhrases,
+  resolveTemporal,
+  resolveTemporalRange,
+  type TemporalContext,
+  type TemporalResolution,
+} from "./temporal";
 
 export interface InterpretationWarning {
   itemRef: string | null;
@@ -343,14 +349,16 @@ export async function interpretExtraction(
   const resolve = (
     item: ExtractionItem,
     fieldNames: string[],
+    extra: Partial<TemporalContext> = {},
   ): { resolution: TemporalResolution; literal: string; confidence: Confidence } | null => {
     const expressions = item.temporal_expressions.filter((t) => fieldNames.includes(t.field));
     if (expressions.length === 0) return null;
+    const context: TemporalContext = { now: input.now, ...extra };
     // A day and a time often arrive as separate literals ("Thursday", "3pm");
     // resolving them together yields the instant, so try the combination first.
     if (expressions.length > 1) {
       const combined = expressions.map((t) => t.literal).join(" ");
-      const together = resolveTemporal(combined, expressions[0].relation, { now: input.now });
+      const together = resolveTemporal(combined, expressions[0].relation, context);
       if (together.kind === "date" || together.kind === "instant") {
         const confidence = expressions.some((t) => t.confidence === "needs_confirmation")
           ? "needs_confirmation"
@@ -359,8 +367,18 @@ export async function interpretExtraction(
       }
     }
     const expression = expressions[0];
-    const resolution = resolveTemporal(expression.literal, expression.relation, { now: input.now });
+    const resolution = resolveTemporal(expression.literal, expression.relation, context);
     return { resolution, literal: expression.literal, confidence: expression.confidence };
+  };
+
+  /** Deadline firmness (finding 21): provider field first, then wording. */
+  const deadlineTypeFor = (item: ExtractionItem, literal: string): "hard" | "soft" => {
+    const declared = item.fields.deadline_type;
+    if (declared === "hard" || declared === "soft") return declared;
+    const text = `${literal} ${str(item.fields.title) ?? ""}`.toLowerCase();
+    return /\b(hard deadline|no later than|at the latest|final deadline|non-negotiable|must be (?:in|done|submitted|filed|sent))\b/.test(text)
+      ? "hard"
+      : "soft";
   };
 
   for (const item of ordered) {
@@ -468,13 +486,13 @@ export async function interpretExtraction(
           const r = deadline.resolution;
           if (r.kind === "date") {
             payload.deadlineDate = r.date;
-            payload.deadlineType = "soft";
+            payload.deadlineType = deadlineTypeFor(item, deadline.literal);
             dueDate = r.date;
             confidences.push(r.confidence);
           } else if (r.kind === "instant") {
             payload.deadlineAt = r.instant;
             payload.deadlineTimezone = r.timezone;
-            payload.deadlineType = "soft";
+            payload.deadlineType = deadlineTypeFor(item, deadline.literal);
             dueDate = r.local.slice(0, 10);
             confidences.push(r.confidence);
           } else {
@@ -573,9 +591,41 @@ export async function interpretExtraction(
           skippedRefs.add(item.item_ref);
           continue;
         }
-        const start = resolve(item, ["start", "starts", "when", "on", "start_at"]);
-        const end = resolve(item, ["end", "ends", "end_at"]);
+        // Finding 20: a range inside the start phrase ("Sept 12–14", "9am–11am")
+        // is resolved as a whole; an explicit end resolves relative to the
+        // start's day and is never replaced by an invented duration.
+        const startFields = ["start", "starts", "when", "on", "start_at"];
+        const startLiteral = item.temporal_expressions
+          .filter((t) => startFields.includes(t.field))
+          .map((t) => t.literal)
+          .join(" ");
+        const range = startLiteral ? resolveTemporalRange(startLiteral, { now: input.now }) : null;
+        const start = range
+          ? {
+              resolution:
+                range.kind === "dates"
+                  ? ({ kind: "date", date: range.start, confidence: "high" } as TemporalResolution)
+                  : range.start,
+              literal: startLiteral,
+              confidence: "high" as Confidence,
+            }
+          : resolve(item, startFields);
         const s = start?.resolution;
+        const startDay =
+          s?.kind === "instant"
+            ? input.now.setZone(s.timezone).set({
+                year: Number(s.local.slice(0, 4)),
+                month: Number(s.local.slice(5, 7)),
+                day: Number(s.local.slice(8, 10)),
+              }).startOf("day")
+            : s?.kind === "date"
+              ? input.now.set({
+                  year: Number(s.date.slice(0, 4)),
+                  month: Number(s.date.slice(5, 7)),
+                  day: Number(s.date.slice(8, 10)),
+                }).startOf("day")
+              : undefined;
+        const end = resolve(item, ["end", "ends", "end_at"], startDay ? { referenceDay: startDay } : {});
         if (!s || (s.kind !== "date" && s.kind !== "instant")) {
           // No usable time: keep the content as a task rather than losing it.
           warnings.push({
@@ -624,21 +674,37 @@ export async function interpretExtraction(
             day: Number(s.date.slice(8, 10)),
           });
           payload.allDayStartDate = s.date;
-          payload.allDayEndDate = startDate.plus({ days: 1 }).toISODate()!;
+          const explicitLast =
+            range?.kind === "dates" ? range.endInclusive : end?.resolution.kind === "date" ? end.resolution.date : null;
+          if (explicitLast && explicitLast >= s.date) {
+            payload.allDayEndDate = DateTime.fromISO(explicitLast).plus({ days: 1 }).toISODate()!;
+          } else {
+            payload.allDayEndDate = startDate.plus({ days: 1 }).toISODate()!;
+            if (end) {
+              warnings.push({ itemRef: item.item_ref, message: "the stated last day could not be used; confirm the range", severity: "needs_confirmation" });
+              confidences.push("needs_confirmation");
+            }
+          }
           dueDate = s.date;
         } else {
           payload.startAt = s.instant;
           payload.timezone = s.timezone;
           dueDate = s.local.slice(0, 10);
-          if (end?.resolution.kind === "instant" && Date.parse(end.resolution.instant) > Date.parse(s.instant)) {
-            payload.endAt = end.resolution.instant;
-          } else {
+          const explicitEnd =
+            range?.kind === "instants" ? range.end.instant : end?.resolution.kind === "instant" ? end.resolution.instant : null;
+          if (explicitEnd && Date.parse(explicitEnd) > Date.parse(s.instant)) {
+            payload.endAt = explicitEnd;
+          } else if (end) {
             payload.endAt = new Date(Date.parse(s.instant) + 60 * 60 * 1000).toISOString();
             warnings.push({
               itemRef: item.item_ref,
-              message: "event end assumed one hour after start",
-              severity: "info",
+              message: "the stated end could not be used; end set provisionally to one hour after start — confirm",
+              severity: "needs_confirmation",
             });
+            confidences.push("needs_confirmation");
+          } else {
+            payload.endAt = new Date(Date.parse(s.instant) + 60 * 60 * 1000).toISOString();
+            warnings.push({ itemRef: item.item_ref, message: "event end assumed one hour after start", severity: "info" });
             confidences.push("medium");
           }
         }
