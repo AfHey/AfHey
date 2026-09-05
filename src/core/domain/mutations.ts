@@ -303,13 +303,43 @@ export async function upsertGlossaryEntryDirect(
   id?: string,
 ) {
   const data = { ...input, normalizedTerm: normalizeLookupKey(input.term) };
-  if (!id) return db.glossaryEntry.create({ data });
   return db.$transaction(async (tx) => {
+    await assertGlossaryTarget(tx, input.entityType ?? null, input.entityId ?? null);
+    if (!id) return tx.glossaryEntry.create({ data });
     const current = await tx.glossaryEntry.findUniqueOrThrow({ where: { id } });
     return guardedUpdate("GlossaryEntry", id, current.revision, () =>
       tx.glossaryEntry.update({ where: { id, revision: current.revision }, data: bumped(data) }),
     );
   });
+}
+
+/**
+ * Finding 18: the glossary's polymorphic (type, id) pair carries no foreign
+ * key, so the application verifies that the target row exists in the table
+ * the type names before any write. A mismatch (an id that lives in another
+ * table) is reported the same way as a missing row.
+ */
+async function assertGlossaryTarget(
+  tx: Prisma.TransactionClient,
+  entityType: GlossaryEntryInput["entityType"] | null,
+  entityId: string | null,
+): Promise<void> {
+  if (!entityType || !entityId) return;
+  const args = { where: { id: entityId }, select: { id: true } };
+  const lookup: Record<string, () => Promise<{ id: string } | null>> = {
+    task: () => tx.task.findUnique(args),
+    event: () => tx.event.findUnique(args),
+    note: () => tx.note.findUnique(args),
+    person: () => tx.person.findUnique(args),
+    project: () => tx.project.findUnique(args),
+  };
+  const find = lookup[entityType];
+  if (!find) {
+    throw new DomainInvariantError("GlossaryEntry", [`${entityType} cannot be a glossary target`]);
+  }
+  if (!(await find())) {
+    throw new DomainInvariantError("GlossaryEntry", [`no ${entityType} exists with id ${entityId}`]);
+  }
 }
 
 export async function updateSettingsDirect(db: PrismaClient, currentTimezone: string) {

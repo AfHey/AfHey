@@ -6,7 +6,11 @@
  * (batch) undo including its conflict paths.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addPersonAliasDirect, updateTaskDirect } from "@/core/domain/mutations";
+import {
+  addPersonAliasDirect,
+  updateTaskDirect,
+  upsertGlossaryEntryDirect,
+} from "@/core/domain/mutations";
 import { applyProposal } from "@/core/proposals/apply";
 import { buildProposal } from "@/core/proposals/build";
 import { ProposalStateError, ProposalValidationError } from "@/core/proposals/errors";
@@ -436,6 +440,33 @@ describe("conflict-aware undo", () => {
     expect(undo.status).toBe("conflicted");
     expect(JSON.stringify(undo.conflictDetails)).toContain("alias");
     expect(await db.person.findUnique({ where: { id: proposal.operations[0].entityId } })).not.toBeNull();
+  });
+
+  it("a glossary link acquired after apply blocks undo of its target (finding 18)", async () => {
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "person", after: { name: "Glossary Person" } }],
+    });
+    const action = actionOf(await approvedApply(proposal.id));
+    const personId = proposal.operations[0].entityId;
+    await upsertGlossaryEntryDirect(db, {
+      term: "GP",
+      expandsTo: "Glossary Person",
+      entityType: "person",
+      entityId: personId,
+    });
+
+    const undo = await buildUndoProposal(db, action.id, nextKey());
+    expect(undo.status).toBe("conflicted");
+    expect(JSON.stringify(undo.conflictDetails)).toContain("glossary");
+    expect(await db.person.findUnique({ where: { id: personId } })).not.toBeNull();
+
+    // The other end is closed too: a pointer at a row that does not exist in
+    // the named table is refused at the source.
+    await expect(
+      upsertGlossaryEntryDirect(db, { term: "GX", expandsTo: "x", entityType: "task", entityId: personId }),
+    ).rejects.toThrow(/no task exists/);
   });
 
   it("undoes a task created with people links, but not after a link was added", async () => {

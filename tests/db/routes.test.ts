@@ -195,6 +195,26 @@ describe("people, glossary, settings routes", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("rejects glossary targets that do not exist or live in another table (finding 18)", async () => {
+    const area = await db.project.create({ data: { kind: "area", name: "Glossary Target Area" } });
+    const body = (term: string, entityType: string, entityId: string) => ({
+      term,
+      expandsTo: "Glossary target",
+      entityType,
+      entityId,
+    });
+    const missing = await routes.glossaryCreate(
+      req("POST", body("GT1", "project", "00000000-0000-4000-8000-000000000123")),
+      ctx(""),
+    );
+    expect(missing.status).toBe(422);
+    const mismatch = await routes.glossaryCreate(req("POST", body("GT2", "person", area.id)), ctx(""));
+    expect(mismatch.status).toBe(422);
+    const ok = await routes.glossaryCreate(req("POST", body("GT3", "project", area.id)), ctx(""));
+    expect(ok.status).toBe(201);
+    expect(await db.glossaryEntry.count({ where: { entityId: area.id } })).toBe(1);
+  });
+
   it("updates the timezone and rejects invalid zones", async () => {
     const ok = await routes.settingsPatch(
       req("PATCH", { currentTimezone: "Europe/Berlin" }),

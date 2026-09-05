@@ -275,6 +275,16 @@ export async function collectDeleteBlockers(
   planned: PlannedDeletes = noPlannedDeletes(),
 ): Promise<string[]> {
   const blockers: string[] = [];
+  // Finding 18: glossary rows point at entities by (type, id) without a
+  // foreign key, so a linked entry — archived or not — is an acquired
+  // dependent of an entity of any type; deleting the target would leave a
+  // dangling pointer.
+  const glossary = await tx.glossaryEntry.count({ where: { entityType, entityId } });
+  if (glossary) {
+    blockers.push(
+      `${glossary} glossary entr${glossary === 1 ? "y points" : "ies point"} at the ${entityType}`,
+    );
+  }
   switch (entityType) {
     case "task": {
       const [sessions, blocks, links] = await Promise.all([
