@@ -55,6 +55,8 @@ interface RunSpec {
   range: Interval;
   mode: SchedulerMode;
   taskFilter?: (taskId: string) => boolean;
+  /** reschedule: where missed blocks are collected from (defaults to `range`). */
+  missedRange?: Interval;
 }
 
 const FEASIBILITY_HORIZON_DAYS = 14;
@@ -86,6 +88,27 @@ export async function rescheduleDay(db: PrismaClient, dateIso: string, options: 
     operation: `reschedule_day:${dateIso}`,
     range: { start: start.toMillis(), end: start.plus({ days: 1 }).toMillis() },
     mode: "reschedule",
+  });
+}
+
+/**
+ * End-of-day roll-over (spec §4.1 item 4): the missed blocks of `from` are
+ * cancelled and their tasks' remaining work is placed into `into`. Nothing
+ * carries over silently — this is a reviewed Proposal like any other plan.
+ */
+export async function rollOver(
+  db: PrismaClient,
+  days: { from: string; into: string },
+  options: SchedulerOptions,
+): Promise<SchedulerRun> {
+  const settings = await loadSchedulerSettings(db);
+  const from = dayStart(days.from, settings.timezone);
+  const into = dayStart(days.into, settings.timezone);
+  return runScheduler(db, settings, options, {
+    operation: `roll_over:${days.from}->${days.into}`,
+    range: { start: into.toMillis(), end: into.plus({ days: 1 }).toMillis() },
+    mode: "reschedule",
+    missedRange: { start: from.toMillis(), end: into.plus({ days: 1 }).toMillis() },
   });
 }
 
@@ -147,8 +170,13 @@ async function runScheduler(
   }));
 
   // Events touching the range, classified.
+  const missedRange = spec.missedRange ?? spec.range;
   const events = await db.event.findMany({
-    where: { archivedAt: null, startAt: { lt: new Date(spec.range.end) }, endAt: { gt: new Date(spec.range.start) } },
+    where: {
+      archivedAt: null,
+      startAt: { lt: new Date(Math.max(spec.range.end, missedRange.end)) },
+      endAt: { gt: new Date(Math.min(spec.range.start, missedRange.start)) },
+    },
     orderBy: [{ startAt: "asc" }, { id: "asc" }],
   });
   const busy: Interval[] = [];
@@ -176,7 +204,8 @@ async function runScheduler(
     const movable = e.scheduleType === "flexible" && !e.isLocked;
     if (e.blockState === "planned" && movable && inScopeTask) replannable.push(toBlock(e));
     else if (e.blockState === "missed_unconfirmed") {
-      if (spec.mode === "reschedule" && inScopeTask) replannable.push(toBlock(e));
+      const inMissedRange = interval.start < missedRange.end && interval.end > missedRange.start;
+      if (spec.mode === "reschedule" && inScopeTask && inMissedRange) replannable.push(toBlock(e));
       else kept.push(toBlock(e));
     } else {
       kept.push(toBlock(e));

@@ -140,16 +140,41 @@ export async function updateTaskDirect(db: PrismaClient, id: string, input: Task
   });
 }
 
-export async function completeTaskDirect(db: PrismaClient, id: string) {
+/**
+ * Completing a task (spec §10.5): its in-progress or most recently ended
+ * block becomes `completed`, later planned blocks are cancelled, and a
+ * running focus session on it is stopped. Uncompleting reverses only the
+ * task status.
+ */
+export async function completeTaskDirect(db: PrismaClient, id: string, now: Date = new Date()) {
   return db.$transaction(async (tx) => {
     const current = await tx.task.findUniqueOrThrow({ where: { id } });
-    return guardedUpdate("Task", id, current.revision, () =>
+    const task = await guardedUpdate("Task", id, current.revision, () =>
       tx.task.update({
         where: { id, revision: current.revision },
-        data: bumped({ status: "completed" as const, completedAt: new Date() }),
+        data: bumped({ status: "completed" as const, completedAt: now }),
       }),
     );
-    // Phase 2 adds: complete current block, cancel later planned blocks.
+    const active = await tx.workSession.findFirst({ where: { taskId: id, stoppedAt: null } });
+    if (active) {
+      const stoppedAt = now.getTime() > active.startedAt.getTime() ? now : new Date(active.startedAt.getTime() + 60_000);
+      await tx.workSession.update({ where: { id: active.id }, data: { stoppedAt, revision: { increment: 1 } } });
+    }
+    const blocks = await tx.event.findMany({
+      where: { kind: "block", taskId: id, archivedAt: null, blockState: { in: ["planned", "in_progress", "missed_unconfirmed"] } },
+      orderBy: { startAt: "asc" },
+    });
+    const inProgress = blocks.find((b) => b.blockState === "in_progress");
+    const ended = blocks.filter((b) => b.endAt && b.endAt.getTime() <= now.getTime());
+    const toComplete = inProgress ?? ended[ended.length - 1] ?? null;
+    for (const b of blocks) {
+      if (b.id === toComplete?.id) {
+        await tx.event.update({ where: { id: b.id }, data: { blockState: "completed", revision: { increment: 1 } } });
+      } else if (b.startAt && b.startAt.getTime() > now.getTime()) {
+        await tx.event.update({ where: { id: b.id }, data: { blockState: "cancelled", revision: { increment: 1 } } });
+      }
+    }
+    return task;
   });
 }
 
