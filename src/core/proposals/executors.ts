@@ -250,18 +250,36 @@ export interface DeleteManifest {
   peopleIds: string[];
 }
 
+/**
+ * Entities an undo removes before the one being checked (finding 1,
+ * 2026-09-05). Relationships to them are not acquired dependents — the
+ * reversal deletes them first — so blocker checks discount exactly these.
+ */
+export type PlannedDeletes = Record<EntityType, Set<string>>;
+
+export const noPlannedDeletes = (): PlannedDeletes => ({
+  task: new Set(),
+  event: new Set(),
+  note: new Set(),
+  person: new Set(),
+  project: new Set(),
+});
+
+const notIn = (ids: Set<string>) => (ids.size > 0 ? { notIn: [...ids] } : undefined);
+
 export async function collectDeleteBlockers(
   tx: Tx,
   entityType: EntityType,
   entityId: string,
   manifest: DeleteManifest,
+  planned: PlannedDeletes = noPlannedDeletes(),
 ): Promise<string[]> {
   const blockers: string[] = [];
   switch (entityType) {
     case "task": {
       const [sessions, blocks, links] = await Promise.all([
         tx.workSession.count({ where: { taskId: entityId } }),
-        tx.event.count({ where: { taskId: entityId } }),
+        tx.event.count({ where: { taskId: entityId, id: notIn(planned.event) } }),
         tx.taskPerson.findMany({ where: { taskId: entityId }, select: { personId: true } }),
       ]);
       if (sessions) blockers.push(`${sessions} work session(s) reference the task`);
@@ -282,9 +300,9 @@ export async function collectDeleteBlockers(
     }
     case "person": {
       const [waiting, taskLinks, eventLinks, aliases] = await Promise.all([
-        tx.task.count({ where: { waitingForPersonId: entityId } }),
-        tx.taskPerson.count({ where: { personId: entityId } }),
-        tx.eventPerson.count({ where: { personId: entityId } }),
+        tx.task.count({ where: { waitingForPersonId: entityId, id: notIn(planned.task) } }),
+        tx.taskPerson.count({ where: { personId: entityId, taskId: notIn(planned.task) } }),
+        tx.eventPerson.count({ where: { personId: entityId, eventId: notIn(planned.event) } }),
         tx.personAlias.findMany({ where: { personId: entityId } }),
       ]);
       if (waiting) blockers.push(`${waiting} waiting-for task(s) reference the person`);
@@ -301,10 +319,10 @@ export async function collectDeleteBlockers(
     }
     case "project": {
       const [children, tasks, events, notes] = await Promise.all([
-        tx.project.count({ where: { parentId: entityId } }),
-        tx.task.count({ where: { projectId: entityId } }),
-        tx.event.count({ where: { projectId: entityId } }),
-        tx.note.count({ where: { projectId: entityId } }),
+        tx.project.count({ where: { parentId: entityId, id: notIn(planned.project) } }),
+        tx.task.count({ where: { projectId: entityId, id: notIn(planned.task) } }),
+        tx.event.count({ where: { projectId: entityId, id: notIn(planned.event) } }),
+        tx.note.count({ where: { projectId: entityId, id: notIn(planned.note) } }),
       ]);
       const total = children + tasks + events + notes;
       if (total) blockers.push(`${total} record(s) belong to the project`);

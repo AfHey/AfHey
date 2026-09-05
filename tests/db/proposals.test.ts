@@ -18,6 +18,7 @@ import {
 } from "@/core/proposals/lifecycle";
 import { buildUndoProposal } from "@/core/proposals/undo";
 import type { ActionLog, PrismaClient } from "@/db/generated/client";
+import { newUuid } from "@/lib/ids";
 import { resetTestDatabase } from "../helpers/test-db";
 
 let db: PrismaClient;
@@ -315,8 +316,12 @@ describe("applying recovery", () => {
 });
 
 describe("conflict-aware undo", () => {
-  it("undoes an applied batch: creates deleted, updates restored, original reverted", async () => {
+  it("undoes a genuinely linked batch: project + task in it + person + task waiting on them", async () => {
+    // Finding 1 (2026-09-05): every created entity references another created
+    // in the same batch; the reversal must discount those relationships.
     const existingTask = await db.task.create({ data: { title: "will be restored" } });
+    const projectId = newUuid();
+    const personId = newUuid();
     const proposal = await buildProposal(db, {
       origin: "inbox",
       idempotencyKey: nextKey(),
@@ -324,13 +329,31 @@ describe("conflict-aware undo", () => {
         {
           op: "create",
           entityType: "project",
+          entityId: projectId,
           after: { kind: "project", name: "Undoable Project", parentId: areaId },
         },
         {
           op: "create",
+          entityType: "person",
+          entityId: personId,
+          after: { name: "Undoable Person", aliases: ["UP2"] },
+        },
+        {
+          op: "create",
           entityType: "task",
-          after: { title: "undoable task", projectId: undefined },
-          dependsOnSequences: [0],
+          after: { title: "undoable task", projectId, peopleIds: [personId] },
+          dependsOnSequences: [0, 1],
+        },
+        {
+          op: "create",
+          entityType: "task",
+          after: {
+            title: "waiting on the new person",
+            taskKind: "waiting_for",
+            waitingForPersonId: personId,
+            projectId,
+          },
+          dependsOnSequences: [0, 1],
         },
         {
           op: "update",
@@ -340,20 +363,23 @@ describe("conflict-aware undo", () => {
         },
       ],
     });
-    const [projectOp, taskOp] = proposal.operations;
+    const [projectOp, personOp, taskOp, waitingOp] = proposal.operations;
     const action = actionOf(await approvedApply(proposal.id));
+    expect(await db.taskPerson.count({ where: { taskId: taskOp.entityId } })).toBe(1);
 
     const undo = await buildUndoProposal(db, action.id, nextKey());
     expect(undo.status).toBe("pending");
     expect(undo.origin).toBe("user");
     expect(undo.undoesActionId).toBe(action.id);
-    expect(undo.operations.map((o) => o.op)).toEqual(["update", "delete", "delete"]);
+    expect(undo.operations.map((o) => o.op)).toEqual(["update", "delete", "delete", "delete", "delete"]);
 
     const undoAction = actionOf(await approvedApply(undo.id));
     expect(undoAction.revertsActionId).toBe(action.id);
 
     expect(await db.project.findUnique({ where: { id: projectOp.entityId } })).toBeNull();
+    expect(await db.person.findUnique({ where: { id: personOp.entityId } })).toBeNull();
     expect(await db.task.findUnique({ where: { id: taskOp.entityId } })).toBeNull();
+    expect(await db.task.findUnique({ where: { id: waitingOp.entityId } })).toBeNull();
     const restored = await db.task.findUniqueOrThrow({ where: { id: existingTask.id } });
     expect(restored.deadlineDate).toBeNull();
     expect(restored.deadlineType).toBeNull();

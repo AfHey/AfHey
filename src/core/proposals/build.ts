@@ -9,7 +9,7 @@ import type { EntityType, OperationType, ProposalOrigin } from "@/core/domain/en
 import { newUuid } from "@/lib/ids";
 import type { Prisma, PrismaClient, Proposal, ProposalOperation } from "@/db/generated/client";
 import { ProposalStateError, ProposalValidationError, type ConflictDetail } from "./errors";
-import { collectDeleteBlockers } from "./executors";
+import { collectDeleteBlockers, noPlannedDeletes } from "./executors";
 import { deleteManifestSchema, parseOperationPayload } from "./payloads";
 
 export interface DraftOperation {
@@ -101,6 +101,9 @@ export async function buildProposal(
   }
 
   const pendingCreates = new Map<string, PendingCreate>();
+  // Deletes at lower sequences happen first at apply time; blocker preflight
+  // discounts relationships to them (finding 1).
+  const plannedDeletes = noPlannedDeletes();
   const prepared: Array<{
     operationId: string;
     sequence: number;
@@ -179,10 +182,12 @@ export async function buildProposal(
           op.entityType,
           entityId,
           manifest ?? { aliases: [], peopleIds: [] },
+          plannedDeletes,
         );
         for (const blocker of blockers) {
           preconditionConflicts.push({ entityType: op.entityType, entityId, reason: blocker });
         }
+        plannedDeletes[op.entityType].add(entityId);
       }
     }
 
