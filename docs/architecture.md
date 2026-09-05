@@ -7,7 +7,7 @@ Status: current. Defined before Phase 1 implementation; keep current thereafter.
 - Backend: Next.js route handlers / server actions
 - Database: PostgreSQL via Prisma
 - Dates: Luxon
-- Calendar rendering: deferred until Phase 2 planning; choose FullCalendar or Schedule-X and record the decision before calendar UI implementation
+- Calendar rendering: FullCalendar v7 standard (MIT) packages through `@fullcalendar/react` with `temporal-polyfill` — time-grid day/week views and the interaction plugin, in a client component; decided 2026-09-05 (decisions.md). The library renders and reports gestures; `core/scheduler` and Luxon own every date computation
 - Validation: Zod at every LLM boundary
 - Tests: Vitest for unit/integration tests; Playwright for end-to-end tests
 - AI providers: OpenAI behind `ExtractionProvider` and `TextReasoningProvider`. Phase 1 extraction uses the pinned `gpt-5.4-mini-2026-03-17` snapshot through the Responses API with JSON-schema Structured Outputs, gated by the versioned extraction evaluation. The Phase 3b reasoning model is selected and pinned before that phase.
@@ -36,7 +36,7 @@ Phase 1 Inbox Proposals always require explicit approval; the general AfHey tool
 Device/browser dictation uses platform facilities and receives no AfHey provider credential. A future direct realtime client connection may use only short-lived, narrowly scoped server-issued credentials. Long-lived provider keys remain server-only. Phase 1 extraction and V1 text reasoning are server mediated.
 
 ## Open items
-See `/docs/product-spec.md` Section 19. Hosting/backups, the Phase 2 calendar rendering library, the exact Phase 3b text-reasoning model, and Phase 3a Tier 2 thresholds remain deliberately unresolved and must be recorded in `/docs/decisions.md` before their owning phase begins.
+See `/docs/product-spec.md` Section 19. Hosting/backups, the exact Phase 3b text-reasoning model, and Phase 3a Tier 2 thresholds remain deliberately unresolved and must be recorded in `/docs/decisions.md` before their owning phase begins. The Phase 2 calendar rendering library was decided 2026-09-05.
 
 ## Deployment requirements
 

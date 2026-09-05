@@ -16,7 +16,6 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Decision: Voice layer will target the documented OpenAI Realtime API model current at Phase 4 (gpt-realtime-2.1 as of today). GPT-Live is not assumed to be API-available. `[Superseded by decisions.md entry: 2026-08-30 Voice and provider boundaries]` No exact Phase 4 model ID is frozen before that phase.
 
 ## Pending
-- Calendar rendering library — decide before Phase 2
 - Exact Phase 3b text-reasoning model — decide before Phase 3b
 - Hosting and backups — decide before Phase 1 deployment
 - Tier 2 scope thresholds — decide before Phase 3a
@@ -256,6 +255,28 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Decision: the finding 20 test is renamed to say what it verifies — an unusable explicit end becomes a provisional one-hour end flagged `needs_confirmation`. The provisional end is an invented fallback accepted only because every Phase 1 proposal is reviewed by hand; the warning is not machine-enforced confirmation, and the fallback must not be reused by automatic scheduling (Phase 2).
 - Open, deliberately not recorded as verified: the 20 eval-v2 cases have been used to tune the prompt and pipeline, so they no longer measure generalization; a fresh, untuned held-out set is required before the live results count as evidence of reliability (see Pending).
 - Reason: an evaluation must assert the intended value, including the absence of a value, or a lucky run passes.
+
+## 2026-09-05 Calendar rendering library: FullCalendar v7 standard packages
+- Decision: render the calendar with FullCalendar v7 through `@fullcalendar/react` (standard packages only: time-grid day/week views and the interaction plugin for drag, resize, and drag-to-select), with its peer `temporal-polyfill` and one of the bundled themes (Breezy, the Tailwind-derived one, unless the spike shows otherwise). Pin the exact version. The scheduler, conflict rules, and all date arithmetic stay in `core/scheduler` and Luxon; the library only draws and reports gestures.
+- Comparison against the Phase 2 needs (2026-09-05 research):
+
+| Need | FullCalendar v7 | Schedule-X | react-big-calendar | MUI X Scheduler / commercial suites |
+|---|---|---|---|---|
+| Day and week time-grid views | standard `timegrid` (MIT) | free views | free | yes |
+| Drag and resize | standard `interaction` plugin (MIT) | **premium plugins** (drag-and-drop, resize, drag-to-create) | community addon; touch support has been fragile | yes (paid tier) |
+| Mobile touch | long-press to drag/resize/select, tunable `longPressDelay` | premium plugins | weak | varies |
+| React 19 + Next 16 | React connector rewritten in React for v7 (SSR and StrictMode supported), React 17–19, ESM-only, client component | `useNextCalendarApp` + `'use client'`, no React version statement | works with React 19 per field reports | MUI X is Emotion/MUI-styled (conflicts with the Tailwind stack) |
+| Named time zones | built in via Temporal, no connector plugin | timezone select | localizer-dependent | yes |
+| License cost | $0 for everything Phase 2 uses; premium ($480/dev/yr) only for resource/timeline views we do not need | €479/yr or €999 lifetime per project for the interactions we need | $0 | paid |
+
+- Rejected: Schedule-X (the two interactions the spec requires are paid, and the project would carry a per-project license from day one); react-big-calendar (touch drag/resize is the weakest of the three and mobile is a hard requirement); MUI X Scheduler and the commercial suites (new or paid, and a second styling system).
+- Risk and fallback: v7.0.x is three months old. Step 1 of the Phase 2 plan is a spike that proves day/week rendering, drag, resize, and long-press on a phone viewport inside Next 16; if a blocker appears, fall back to FullCalendar 6.1.x (same standard packages, MIT, React 19 supported) and record it here. Resize may be deferred to Phase 5 under spec §15 if it consumes disproportionate time.
+- Reason: it is the only candidate that meets every listed need with MIT-licensed code, and it keeps the calendar a rendering detail rather than an engine.
+
+## 2026-09-05 Week view promoted to Phase 2
+- Decision (product owner): Phase 2 ships the day view and the week view. The 2026-08-30 "Release boundaries and phase ownership" entry made week and month views Phase 5 unless promoted; the week view is promoted now, the month view stays Phase 5. Plan-week scheduling uses the week view as its review surface.
+- Rejected: day view only (the scheduler's week planning would have no visual diff surface); month view now (no scheduling need in V1).
+- Reason: FullCalendar renders both time-grid views from one configuration, so the week view costs configuration, not engine work.
 
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.

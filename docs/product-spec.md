@@ -257,11 +257,11 @@ The user should also be able to:
 - manually reschedule
 - unschedule a task while keeping it in the task list
 
-Provide at least: day view, week view, month view if practical. Day and week views are the highest priority. `[Superseded by decisions.md entry: 2026-08-30 Release boundaries and phase ownership]` Phase 2 (V1) requires day view; week/month views are Phase 5 unless explicitly promoted by a later decision.
+Provide at least: day view, week view, month view if practical. Day and week views are the highest priority. `[Superseded by decisions.md entry: 2026-08-30 Release boundaries and phase ownership]` Phase 2 (V1) requires day view; week/month views are Phase 5 unless explicitly promoted by a later decision. `[Superseded in part by decisions.md entry: 2026-09-05 Week view promoted to Phase 2]` The week view is promoted to Phase 2; the month view remains Phase 5.
 
 ### 5.1 Calendar additions (A)
 
-1. **Use a mature calendar component library** for rendering, drag, resize, collision layout, and mobile gestures (candidates: FullCalendar, Schedule-X; final choice recorded in `/docs/decisions.md`). The scheduler is custom; the visual calendar infrastructure is not. A custom calendar engine is explicitly out of scope.
+1. **Use a mature calendar component library** for rendering, drag, resize, collision layout, and mobile gestures (candidates: FullCalendar, Schedule-X; final choice recorded in `/docs/decisions.md` — FullCalendar v7 standard packages, 2026-09-05). The scheduler is custom; the visual calendar infrastructure is not. A custom calendar engine is explicitly out of scope.
 2. **Change log for rescheduling.** When the engine moves blocks, present a diff ("moved Manuscript tables from Wed 19:00 to Thu 19:00") with a single revert. This is a Proposal (Section 11).
 3. **Do-date versus deadline.** A task has a deadline (when it is due) and a stored do-date set by the scheduler. `[Superseded by decisions.md entry: 2026-08-30 Scheduled blocks and task timing]` Authoritatively, the Task keeps its deadline while planned work dates are derived from non-cancelled `kind = block` Events; `do_date` is not stored.
 4. **Backlog and Someday buckets** for unscheduled items, so they do not clutter Today.
@@ -1012,7 +1012,7 @@ The experience should already be useful enough to serve as the daily personal pr
 
 ## 19. Open Decisions (record outcomes in /docs/decisions.md)
 
-1. Calendar rendering library for Phase 2: FullCalendar versus Schedule-X; decide and record before Phase 2 implementation.
+1. Calendar rendering library for Phase 2: FullCalendar versus Schedule-X; decide and record before Phase 2 implementation. **Decided 2026-09-05: FullCalendar v7 standard packages (decisions.md "Calendar rendering library: FullCalendar v7 standard packages").**
 2. Exact OpenAI text-reasoning model for Phase 3b; select with a versioned evaluation before Phase 3b implementation.
 3. Hosting/database/backups; decide before deploying Phase 1 and record backup retention/deletion behavior.
 4. Tier 2 scope thresholds; decide before Phase 3a implementation.

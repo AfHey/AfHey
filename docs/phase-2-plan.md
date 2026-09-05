@@ -1,0 +1,115 @@
+# Phase 2 Implementation Plan — Time
+
+**Status:** Proposed 2026-09-05; awaiting product-owner approval before any code is written.
+**Basis:** `product-spec.md` Sections 4–5, 7, 8.3, 9–11, 15 (Phase 2 exit criteria), 17–19; `architecture.md`; every `decisions.md` entry through 2026-09-05, including "Calendar rendering library: FullCalendar v7 standard packages" and "Week view promoted to Phase 2"; the Phase 1 independent review and verification (both closed).
+
+## 1. Scope summary
+
+Phase 2 (Time) delivers: the scheduler-constraint tables and their editing UI; the deterministic scheduler (free-time computation, placement with splitting and constraints, feasibility check, priority recomputation) whose every output is a Proposal with `origin = scheduler` and explicit approval; block Events (`kind = block`) created, moved, locked, completed, cancelled, and marked `missed_unconfirmed` with rescheduling Proposals; the focus timer writing WorkSession rows; the Today screen (fixed events, planned blocks, Must/Should/Could, Waiting For, capacity check, roll-over prompt); day and week calendar views rendered by FullCalendar with drag, resize, lock, fix, unschedule, and create-by-selection; basic keyword/filter search across Tasks, Projects, Notes, and Events; the maintenance job extended with missed-block detection and priority recomputation; e2e coverage of the exit criteria.
+
+Explicit non-goals, deferred per spec: month view, recurrence, estimate calibration *applied to* scheduling, external calendar sync (Phase 5); the tool registry, permission tiers, `lighten_day`, `make_room_for`, `postpone_low_priority_tasks` as tools (Phase 3a — the engine primitives they need are built here, the operations themselves are 3a); AfHey chat, conversational search, command palette, export (Phase 3b); notifications and reminder delivery (Phase 6). Nothing in Phase 2 calls a language model: the scheduler is deterministic code, and search is keyword/filter plus the existing deterministic date-phrase resolver.
+
+## 2. Working agreements (bind every step)
+
+1. Tests (`typecheck`, Vitest, Playwright where UI changes) before every commit; one commit per step or tight group; spec and `decisions.md` updated in the same commit as any architecture, data-model, or scope change.
+2. The scheduler never mutates state: it returns Proposals (`origin = scheduler`, `approval_policy = explicit`). User gestures on the calendar (drag, resize, lock, fix, unschedule) are ordinary manual single-entity edits under spec §11.2 rule 13: direct transactional mutations with revision checks, no Proposal.
+3. Deterministic code owns time: Luxon for arithmetic in `UserSettings.current_timezone`, instants stored in UTC with a separate zone, calendar dates as dates. `now` is always an input to the engine, never read inside it. Same inputs, same output, byte for byte.
+4. Validation rule §11.2.2: scheduler-placed blocks may not overlap fixed Events, other blocks, or protected windows (without an explicit user override recorded on the Proposal); a user-approved manual move that double-books a fixed Event is a warning, not a rejection; soft preferred windows only ever warn.
+5. The calendar library renders and reports gestures. No date computation, conflict detection, or scheduling logic lives in the component.
+6. Everything visible on Today and the calendar is derived from stored Tasks, Events, and WorkSessions; no cached do-dates, no cached actual durations, no stored deadline Events.
+7. Fixtures and seeds stay wholly fictional. Real personal use starts on `afhey_dev` at the end of the phase, never inside tests.
+
+## 3. Ordered implementation steps
+
+**Step 1 — Calendar library spike and pin.** Add `@fullcalendar/react@7.x` (exact pin) and its peer `temporal-polyfill`; a `'use client'` calendar component with `timeGridDay`/`timeGridWeek`, the interaction plugin, `timeZone` set to the user's zone, skeleton + theme CSS imported once; render fixed Events and existing (non-block) Events read-only. Prove in Next 16: hydration without warnings, drag and resize on desktop, long-press drag on a phone viewport (Playwright mobile emulation plus a manual iPhone check), date/time reported back in the configured zone. Record versions in README; if a blocker appears, fall back to 6.1.x and record it. Tests: component render smoke; e2e "calendar shows a fixed event at the right wall-clock time in the user's zone".
+
+**Step 2 — Phase 2 migration and constraint settings.** Hand-written migration (Prisma 7 `migrate deploy` path, as in Phase 1) creating the four scheduler tables in Section 4 plus the `Project.domain` column and the search columns/indexes; Zod schemas and invariant validators (window `start < end`, weekday range, at most one preferences row, `domain` only on areas); direct mutations with revisions; Settings UI: weekday availability editor, protected windows (recurring or one-off), preferred windows by work type, scalar knobs, job-time policy. Tests: migration from scratch on `afhey_test`; DB constraint tests; settings route tests (400/422 mapping); an e2e settings pass on a phone viewport.
+
+**Step 3 — Timeline and free time (`core/scheduler/timeline.ts`).** Interval algebra over UTC instants; per-day timelines built in the user's zone (DST-aware: a 23-hour spring-forward day and a 25-hour fall-back day, Lord Howe's 30-minute shift); availability windows minus protected windows minus fixed Events minus locked or in-progress blocks, buffers applied, snapped to a 5-minute grid; `get_free_time(range, min_minutes)` as a read-only primitive. Tests: suite G.
+
+**Step 4 — Priority recomputation (§8.3).** Deterministic `computed_priority_score` from deadline proximity (using `remaining_estimate_minutes` when present), project/area importance, task age, `waiting_for` ownership, and hard deadline type; `effective_priority` banding already exists; recomputation runs in the maintenance job and immediately before any planning; `user_priority` is never written. Tests: suite I (score table, band boundaries, manual override untouched).
+
+**Step 5 — Feasibility check (`core/scheduler/feasibility.ts`).** For each open task with a deadline: eligible free capacity between `now` and the deadline (from Step 3) versus `remaining_estimate_minutes` → `fits | at_risk (shortfall minutes, first day capacity runs out) | estimate_required | no_deadline`; per-day capacity numbers for Today's capacity check. Computed on read; nothing stored. Tests: suite I.
+
+**Step 6 — Placement engine and scheduler Proposals (`core/scheduler/plan.ts`, `core/scheduler/operations.ts`).** The algorithm in Section 5; composed operations `plan_day(date)`, `plan_week(week_start)`, `schedule_task(task_id, window)`, `reschedule_day(date)` returning Proposals whose operations create block Events (preallocated UUIDs), move flexible unlocked blocks (with `expected_revision`), and cancel superseded blocks, each with a deterministic `reason`; Proposal validation extended with rule §11.2.2 (block overlap and protected-window rejections; fixed double-booking warning for user-origin operations); a diff summary derived from `before`/`after` for the calendar review. Tests: suite H, plus proposals-engine tests for the new validation rules and undo of an applied scheduler Proposal (conflicted after a later manual move).
+
+**Step 7 — Block lifecycle, focus timer, missed blocks.** Direct mutations: `move_block` (drag/resize with revision check and overlap/protected warnings), lock/unlock, mark fixed (clears lock per invariant), unschedule (block `cancelled`, task stays), create fixed Event by selection; task completion cascade (§10.5: current or most recent block `completed`, later planned blocks `cancelled`; uncomplete reverses only the status); focus timer start/stop creating WorkSessions (one active session per user, block `in_progress` exactly while active, derived and corrected durations); `missed_unconfirmed` transition for planned blocks whose end passed with no completion or WorkSession (maintenance job and on Today/Calendar load, idempotent); "Mark work done" (block `completed` plus a WorkSession spanning the block, user-confirmed) and "Reschedule" (Step 6 `reschedule_day`/`schedule_task` Proposal that cancels the missed block and places a new one); estimate-versus-actual ratio per task and per work type exposed read-only. Tests: suite J.
+
+**Step 8 — Calendar UI (day and week).** FullCalendar views fed by a server view-model: fixed Events, flexible blocks (distinct styling, lock pin, block state), deadlines derived at render time as read-only all-day markers; gestures wired to Step 7 mutations with optimistic UI and revision-conflict recovery; "Plan day" / "Plan week" buttons producing Step 6 Proposals reviewed as a calendar diff ("moved X from Wed 19:00 to Thu 19:00") with accept, edit (drop an operation), reject, and a single revert after apply (conflict-aware undo); missed-block prompts inline. Navigation gains Today and Calendar. Tests: view-model unit tests; e2e desktop and phone: drag a block, resize it, lock it, plan a day and apply, revert.
+
+**Step 9 — Today screen (§4).** Sections: Fixed Events, Planned Blocks (with focus timer), Tasks by effective priority (Must/Should/Could, filtered to active bucket, deadline chips, feasibility flags), Waiting For (with nudge dates), capacity check (scheduled minutes vs available minutes for the day; overcommitted warning before the day starts), roll-over prompt for yesterday's incomplete planned items (Reschedule → Proposal, Postpone to a chosen day → Proposal, Move to Backlog → direct mutation; nothing carries silently), Quick Add. Phone-first layout. Tests: view-model unit tests; e2e phone pass.
+
+**Step 10 — Basic search (§10.7, §10.8.6).** PostgreSQL full-text search over the generated columns from Step 2 across Tasks, Projects, Notes, Events; filters for type, project, status, bucket, and due window; date phrases ("due Friday") resolved by the existing deterministic temporal resolver, never by a model; a search box in the navigation. Tests: suite L.
+
+**Step 11 — Maintenance job.** `jobs:expire` becomes `jobs:maintenance`: capture expiry, apply recovery, missed-block transitions, priority recomputation; README updated; idempotent and safe to run any time. Tests: job integration.
+
+**Step 12 — End-to-end, exit criteria, review.** Playwright: constraints configured → fixed events entered → tasks with estimates → "Plan day" places blocks into real free time without overlaps → Today on a phone shows the plan → a block is missed → reschedule Proposal → apply → undo; capacity warning; search. Verify the Phase 2 exit criteria (Section 8), docs sweep, request the independent review, and begin personal daily use on `afhey_dev`.
+
+## 4. New tables and columns (Phase 2 migration)
+
+The Phase 1 migration boundary deferred exactly the scheduler-constraint child tables of UserSettings. Phase 2 creates:
+
+1. **`availability_window`** — when the scheduler may place flexible work. `id`, `user_settings_id`, `revision`, `weekday` (1–7, Monday first), `start_time`, `end_time` (local times, `start < end`, no overnight windows in V1), `kind: general | job` (job windows are the user's employment hours, configured separately from any job Event), `label` nullable, timestamps. A weekday with no windows has no availability.
+2. **`protected_window`** — hard-unavailable time the scheduler cannot use without an explicit override recorded on the Proposal. `id`, `user_settings_id`, `revision`, `recurrence: weekly | once`, `weekday` (required for weekly), `on_date` (required for once), `start_time`, `end_time`, `label`, timestamps.
+3. **`preferred_window`** — soft preferences the scheduler scores toward and may leave with a stated reason. `id`, `user_settings_id`, `revision`, `weekday` nullable (null = every day), `start_time`, `end_time`, `work_type` nullable (null = any), `label`, timestamps.
+4. **`scheduler_preferences`** — one row per UserSettings: `min_block_minutes` (default 25), `max_block_minutes` (default 120), `buffer_minutes` (default 10), `daily_deep_work_cap_minutes` (default 240), `job_time_policy: unavailable | work_related_only | any` (default `work_related_only`), `planning_horizon_days` (default 7), `revision`, timestamps.
+
+Columns and indexes, no new tables:
+
+5. **`project.domain`** — nullable `work | personal`, set on areas only (inherited by their projects); with `job_time_policy = work_related_only`, job windows accept only tasks whose area is `work`. Recorded in `decisions.md` at Step 2.
+6. **Search** — generated `tsvector` columns with GIN indexes on `task` (title, description, notes), `project` (name, description), `note` (title, body), `event` (title, description, location).
+
+No new tables for: missed blocks (an Event `block_state`), the focus timer (WorkSession exists), feasibility and capacity (computed on read), the roll-over prompt (derived from yesterday's blocks and tasks), estimate calibration (derived from WorkSession versus Task), scheduler Proposals (Proposal `origin = scheduler` already exists). Conversation, Message, TurnReferenceSet, and `Proposal.conversation_id` stay Phase 3b.
+
+## 5. Deterministic scheduler — algorithm outline
+
+Module `core/scheduler/`. Pure functions over explicit inputs; the only I/O is loading inputs and building the Proposal.
+
+**Inputs.** `now`; the user's zone; the planning range; `scheduler_preferences`; availability, protected, and preferred windows; fixed Events and all-day Events in range; existing blocks in range with their state, lock, and revision; eligible tasks: `status = open`, `bucket = active`, `is_schedulable`, `remaining_estimate_minutes` present, `earliest_start_date` not after the day, not already fully covered by kept blocks. Tasks without an estimate are reported as `estimate_required` and never placed.
+
+**Step A — Timeline.** For each day in range, in the user's zone: availability windows (job windows only if the policy admits the task's domain) → subtract protected windows → subtract fixed Events, all-day Events that block time (kind other than block), locked blocks, in-progress blocks, and any block the operation keeps → apply `buffer_minutes` around every kept item → snap to a 5-minute grid → free intervals as UTC instant pairs. Local wall-clock windows are converted with Luxon per day, so DST days come out 23 or 25 hours long and Lord Howe's half-hour shift is honored; nonexistent local times inside a window are skipped, duplicated ones counted once.
+
+**Step B — Which blocks are re-plannable.** `plan_day`/`plan_week`: flexible, unlocked, `planned` blocks in range are candidates to move; fixed, locked, in-progress, completed, and cancelled blocks are kept. `reschedule_day`: additionally treats `missed_unconfirmed` blocks in range as work to re-place (the missed block is cancelled in the same Proposal). `schedule_task`: touches only the given task's blocks.
+
+**Step C — Task ordering.** Sort by effective priority band (must, should, could), then by slack (minutes of eligible free capacity before the deadline minus remaining minutes; smaller first; tasks without a deadline last), then by `computed_priority_score` descending, then by `created_at`, then by `id`. Stable and total, so the output is reproducible.
+
+**Step D — Placement.** For each task, walk free intervals chronologically from `max(now, earliest_start)`:
+- an interval qualifies if it is at least `min_block_minutes` and, for a task with a deadline, ends no later than `deadline_at` (or the end of `deadline_date` in the user's zone); a hard deadline rejects later placement outright, a soft one allows it with an `after_deadline` warning;
+- block length is `min(remaining, max_block_minutes, interval length)`; if the task is not splittable, only intervals of at least the full remaining estimate qualify (otherwise the task is reported `no_single_slot`);
+- deep-work tasks respect `daily_deep_work_cap_minutes` per day;
+- each qualifying interval is scored: preferred window match for the task's `work_type` and the task's own `preferred_window_*` (positive), earlier date (positive, so work is not deferred), fewer resulting splits (positive), spillover into a soft-dispreferred time (negative, with a reason string); the highest score wins, ties broken by earliest start;
+- the chosen block is subtracted from the timeline (with buffer) and the remaining estimate is reduced; repeat until the task is covered or no interval qualifies (then report `unplaced_remaining` minutes).
+
+**Step E — Proposal.** Operations, in dependency order: cancel blocks being replaced (`update` with `expected_revision`, `block_state = cancelled`), move re-plannable blocks that changed (`update` with `expected_revision`, new start/end), create new blocks (`create`, preallocated UUIDs, `kind = block`, `schedule_type = flexible`, `block_state = planned`, `task_id`, zone). Every operation carries a template `reason` ("placed in preferred deep-work window", "moved after new fixed event 14:00–15:00", "re-placing a block that ended without an outcome"). A summary lists placed, moved, cancelled, unplaced, and `estimate_required` tasks plus feasibility flags. The Proposal is validated by the engine (rule §11.2.2) and awaits explicit approval; after apply it is undoable with the existing conflict-aware undo.
+
+**Step F — Feasibility.** Independent of placement: for each open task with a deadline, eligible capacity from `now` to the deadline versus the remaining estimate → `fits | at_risk | estimate_required`; Today shows the at-risk list and the day's scheduled-versus-available minutes.
+
+**Determinism and idempotency.** No randomness; no clock reads; inputs are sorted by stable keys; the idempotency key is derived from operation name, target date/range, and the caller's intent key so a retried click returns the same Proposal.
+
+## 6. Test list
+
+- **G — Timeline and free time** (`src/core/scheduler/timeline.test.ts`): interval union/subtract/snap; availability minus protected minus fixed; buffers; locked and in-progress blocks kept; job windows admitted per policy and domain; spring-forward day (23 h), fall-back day (25 h), Lord Howe; window containing a nonexistent local time; zone change between two plans.
+- **H — Placement** (`src/core/scheduler/plan.test.ts`): ordering table (band, slack, score, age); non-splittable task needs one slot; splittable task split at `max_block_minutes`; `min_block_minutes` respected; deep-work cap; preferred-window scoring; earliest start; hard deadline rejects, soft deadline warns; no overlap with fixed/blocks/protected in any output (property-style over fixture sets); unplaced remainder reported; determinism (identical output for identical inputs, order-shuffled inputs); `plan_day`, `plan_week`, `schedule_task`, `reschedule_day` operation shapes and reasons.
+- **I — Priority and feasibility** (`src/core/scheduler/priority.test.ts`, `feasibility.test.ts`): score table and band edges; manual override untouched; fits / at-risk shortfall / estimate_required / no_deadline; capacity numbers per day.
+- **J — Block lifecycle** (`tests/db/blocks.test.ts`, `tests/db/work-sessions.test.ts`): move with stale revision conflicts; overlap and protected warnings on manual moves; lock/unlock; mark fixed clears lock; unschedule; completion cascade and uncomplete; single active WorkSession; `in_progress` exactly while active; derived and corrected durations; `missed_unconfirmed` transition idempotent and never for completed or in-progress blocks; mark-done and reschedule paths; calibration ratio.
+- **K — Scheduler Proposals through the engine** (`tests/db/scheduler-proposals.test.ts`): plan_day builds, validates, applies, and persists blocks; validation rejects overlapping scheduler blocks and protected windows without override; user-origin double-booking of a fixed Event warns; undo after apply; undo conflicted after a later manual move; reschedule of a missed block cancels and places.
+- **L — Search** (`tests/db/search.test.ts`): keyword hits across the four types; filters; due-window phrases; no hits from `ai_excluded`-irrelevant fields (search is local, so `ai_excluded` records are searchable — asserted explicitly).
+- **M — Settings and migration** (`tests/db/scheduler-settings.test.ts`, `phase2-schema.test.ts`): migration from scratch; constraint invariants; routes.
+- **UI and e2e** (`e2e/calendar.spec.ts`, `e2e/today.spec.ts`, `e2e/search.spec.ts`): Step 1 render check; drag/resize/lock; plan day → review diff → apply → revert; Today on a phone with capacity warning and roll-over prompt; focus timer start/stop; search.
+
+## 7. Dependencies
+
+- `@fullcalendar/react@7.x` (exact pin) and `temporal-polyfill` — decided in `decisions.md` 2026-09-05 and recorded in `architecture.md`. No other new runtime dependency is planned; search uses PostgreSQL full-text, the scheduler uses Luxon.
+
+## 8. Phase 2 exit criteria (spec §15)
+
+Flexible tasks are placed automatically into real free time (respecting fixed Events, protected windows, and constraints) through a reviewed Proposal; Today is usable daily on a phone (fixed events, planned blocks, Must/Should/Could, Waiting For, capacity check, roll-over prompt, focus timer); day and week views render the plan with working drag, resize, lock, and unschedule; missed blocks surface and reschedule through Proposals; basic search works. Then the independent review of spec and code, and daily personal use begins.
+
+## 9. Open items for the product owner (answer with plan approval)
+
+1. **Job time modeling.** Proposed: employment hours are `availability_window.kind = job` rows plus `scheduler_preferences.job_time_policy`; "work-related" is `project.domain = work` on the task's area. Confirm, or prefer a flag on job Events instead.
+2. **Manual moves onto conflicts.** Proposed: dragging a block onto a fixed Event or another block is allowed with a visible warning (the user's right); the scheduler itself never creates such overlaps. Confirm.
+3. **Roll-over prompt actions.** Proposed: Reschedule and Postpone produce Proposals; Move to Backlog is a direct edit. Confirm.
+4. **Defaults**: Monday week start; 7-day planning horizon; 25/120-minute block bounds; 10-minute buffer; 240-minute deep-work cap. Adjust if wanted.
+5. **Resize deferral clause** (spec §15): if resize on touch proves costly in Step 1, defer it to Phase 5 and record; day/week views, drag, and lock stay.
+6. **Composed operations in Phase 2**: `plan_day`, `plan_week`, `schedule_task`, `reschedule_day` ship now; `lighten_day`, `make_room_for`, `postpone_low_priority_tasks` ship in Phase 3a on the same engine. Confirm.
