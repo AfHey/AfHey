@@ -80,7 +80,7 @@ function referencesOf(
   if (entityType === "task" && typeof p.waitingForPersonId === "string") {
     refs.push({ field: "waitingForPersonId", id: p.waitingForPersonId, want: "person" });
   }
-  if (entityType === "task" && op === "create" && Array.isArray(p.peopleIds)) {
+  if ((entityType === "task" || entityType === "event") && op === "create" && Array.isArray(p.peopleIds)) {
     for (const id of p.peopleIds) {
       if (typeof id === "string") refs.push({ field: "peopleIds", id, want: "person" });
     }

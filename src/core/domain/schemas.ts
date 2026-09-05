@@ -135,6 +135,10 @@ export const eventFieldsSchema = z.object({
 });
 
 export const eventCreateSchema = eventFieldsSchema
+  .extend({
+    /** Participants linked through EventPerson at creation (spec §9.1; finding 19). */
+    peopleIds: z.array(z.uuid()).max(20),
+  })
   .partial()
   .required({ title: true, kind: true, scheduleType: true, timezone: true })
   .superRefine((input, ctx) => {

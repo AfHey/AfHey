@@ -44,7 +44,7 @@ const updateSchemas: Record<EntityType, ZodType> = {
 
 /**
  * What an undo-delete expects to find and remove alongside the row: the
- * person aliases or task people-links created by the original create. Any
+ * person aliases or task/event people-links created by the original create. Any
  * extra row is an acquired dependent and blocks the delete.
  */
 export const deleteManifestSchema = z

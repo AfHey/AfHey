@@ -186,9 +186,15 @@ export function toEventData(input: EventUpdateInput) {
 }
 
 export async function createEventDirect(db: PrismaClient, input: EventCreateInput) {
+  const { peopleIds, ...fields } = input;
   return db.$transaction(async (tx) => {
-    await assertProjectRefIsProject(tx, input.projectId);
-    return tx.event.create({ data: toEventData(input) as Prisma.EventUncheckedCreateInput });
+    await assertProjectRefIsProject(tx, fields.projectId);
+    return tx.event.create({
+      data: {
+        ...(toEventData(fields) as Prisma.EventUncheckedCreateInput),
+        people: { create: uniquePeople(peopleIds).map((personId) => ({ personId })) },
+      },
+    });
   });
 }
 

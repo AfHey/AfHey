@@ -500,6 +500,48 @@ describe("conflict-aware undo", () => {
     expect(JSON.stringify(blocked.conflictDetails)).toContain("person link");
   });
 
+  it("undoes an event created with participants, but not after a link was added (finding 19)", async () => {
+    const person = await db.person.create({ data: { name: "Event Person" } });
+    const other = await db.person.create({ data: { name: "Event Other Person" } });
+    const build = () =>
+      buildProposal(db, {
+        origin: "inbox",
+        idempotencyKey: nextKey(),
+        operations: [
+          {
+            op: "create",
+            entityType: "event",
+            after: {
+              title: "planning lunch",
+              kind: "meeting",
+              scheduleType: "fixed",
+              startAt: "2026-09-12T16:00:00Z",
+              endAt: "2026-09-12T17:00:00Z",
+              timezone: "America/New_York",
+              peopleIds: [person.id],
+            },
+          },
+        ],
+      });
+
+    const clean = await build();
+    const cleanAction = actionOf(await approvedApply(clean.id));
+    const eventId = clean.operations[0].entityId;
+    expect(await db.eventPerson.findMany({ where: { eventId } })).toMatchObject([{ personId: person.id }]);
+    const undo = await buildUndoProposal(db, cleanAction.id, nextKey());
+    expect(undo.status).toBe("pending");
+    actionOf(await approvedApply(undo.id));
+    expect(await db.event.findUnique({ where: { id: eventId } })).toBeNull();
+    expect(await db.eventPerson.count({ where: { eventId } })).toBe(0);
+
+    const touched = await build();
+    const touchedAction = actionOf(await approvedApply(touched.id));
+    await db.eventPerson.create({ data: { eventId: touched.operations[0].entityId, personId: other.id } });
+    const blocked = await buildUndoProposal(db, touchedAction.id, nextKey());
+    expect(blocked.status).toBe("conflicted");
+    expect(JSON.stringify(blocked.conflictDetails)).toContain("person link");
+  });
+
   it("batch undo conflicts as a whole: no member is deleted", async () => {
     const proposal = await buildProposal(db, {
       origin: "inbox",

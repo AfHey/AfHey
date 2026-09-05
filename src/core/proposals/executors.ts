@@ -127,10 +127,14 @@ export async function executeCreate(
       return;
     }
     case "event": {
-      const input = payload as EventCreateInput;
-      await assertProjectRefIsProject(tx, input.projectId);
+      const { peopleIds, ...fields } = payload as EventCreateInput;
+      await assertProjectRefIsProject(tx, fields.projectId);
       await tx.event.create({
-        data: { ...toEventData(input), id: entityId } as Prisma.EventUncheckedCreateInput,
+        data: {
+          ...(toEventData(fields) as Prisma.EventUncheckedCreateInput),
+          id: entityId,
+          people: { create: uniquePeople(peopleIds).map((personId) => ({ personId })) },
+        },
       });
       return;
     }
@@ -302,10 +306,12 @@ export async function collectDeleteBlockers(
     case "event": {
       const [sessions, links] = await Promise.all([
         tx.workSession.count({ where: { eventId: entityId } }),
-        tx.eventPerson.count({ where: { eventId: entityId } }),
+        tx.eventPerson.findMany({ where: { eventId: entityId }, select: { personId: true } }),
       ]);
       if (sessions) blockers.push(`${sessions} work session(s) reference the event`);
-      if (links) blockers.push(`${links} person link(s) were added to the event`);
+      const expected = new Set(manifest.peopleIds);
+      const added = links.filter((l) => !expected.has(l.personId)).length;
+      if (added) blockers.push(`${added} person link(s) were added to the event after creation`);
       break;
     }
     case "person": {
@@ -370,6 +376,11 @@ export async function executeDelete(
     if (entityType === "task") {
       await tx.taskPerson.deleteMany({
         where: { taskId: entityId, personId: { in: manifest.peopleIds } },
+      });
+    }
+    if (entityType === "event") {
+      await tx.eventPerson.deleteMany({
+        where: { eventId: entityId, personId: { in: manifest.peopleIds } },
       });
     }
     await delegateFor(tx, entityType).delete({ where: { id: entityId } });

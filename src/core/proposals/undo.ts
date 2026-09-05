@@ -57,7 +57,7 @@ export async function buildUndoProposal(
         const manifest =
           entityType === "person"
             ? { aliases: (after.aliases ?? []).map(normalizeLookupKey), peopleIds: [] }
-            : entityType === "task"
+            : entityType === "task" || entityType === "event"
               ? { aliases: [], peopleIds: [...new Set(after.peopleIds ?? [])] }
               : undefined;
         operations.push({

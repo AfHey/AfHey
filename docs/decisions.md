@@ -211,6 +211,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: per-type foreign keys (five nullable columns for one polymorphic reference); silently clearing glossary links when their target is deleted.
 - Reason: a loose reference is acceptable only if the application closes both ends — nothing may create a dangling pointer, and nothing may create one by deleting the target.
 
+## 2026-09-05 Event participants are first-class (finding 19)
+- Decision: event create payloads carry `peopleIds`; the executor and the manual event API persist them as EventPerson rows; undo manifests record them so an event with its original participants undoes cleanly while a participant added later blocks the delete; the interpretation pipeline maps resolved person references and proposed person items on an event to `peopleIds` (an ambiguous mention flags `needs_confirmation`, as for tasks). The prompt names event participants explicitly under the `people` reference field (prompt `p5-2026-09-05`).
+- Rejected: leaving EventPerson write-only for Phase 2, with extracted attendees dropped or stuffed into `description`.
+- Reason: "lunch with [PERSON_1]" is the most common event capture; losing the participant defeats the review card, and a link created by the batch must be reversible by the batch.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

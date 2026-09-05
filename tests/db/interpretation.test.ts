@@ -307,6 +307,59 @@ describe("interpretExtraction", () => {
     expect(outcome.warnings.some((w) => /several people/.test(w.message))).toBe(true);
   });
 
+  it("carries event participants into peopleIds and persists EventPerson rows on apply (finding 19)", async () => {
+    const known = await db.person.create({ data: { name: "Known Attendee" } });
+    const payload = "lunch with [PERSON_1] and Dara Voss Thursday at noon";
+    const capture = await newCapture(payload);
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [{ placeholder: "[PERSON_1]", entityType: "person", candidateIds: [known.id], confidence: "high" }],
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "person",
+          fields: { name: "Dara Voss" },
+          field_evidence: [{ field: "name", evidence: evidence(payload.indexOf("Dara"), payload.indexOf("Dara") + 9), confidence: "high" }],
+        }),
+        item({
+          item_ref: "item-2",
+          entity_type: "event",
+          depends_on_item_refs: ["item-1"],
+          fields: { title: "lunch", event_kind: "meeting" },
+          temporal_expressions: [
+            {
+              field: "start",
+              literal: "Thursday at noon",
+              relation: "on",
+              anchor_entity_id: null,
+              evidence: evidence(payload.indexOf("Thursday"), payload.length),
+              confidence: "high",
+            },
+          ],
+          entity_references: [
+            { field: "people", candidate_ids: [known.id], unresolved_literal: null, evidence: evidence(11, 21), confidence: "high" },
+          ],
+          field_evidence: [{ field: "title", evidence: evidence(0, 5), confidence: "high" }],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    expect(outcome.proposal).not.toBeNull();
+    const [personOp, eventOp] = outcome.proposal!.operations;
+    expect(personOp.entityType).toBe("person");
+    expect(eventOp.entityType).toBe("event");
+    const after = eventOp.after as { peopleIds: string[]; startAt: string };
+    expect(after.peopleIds).toEqual([known.id, personOp.entityId]);
+    expect(after.startAt).toBe("2026-09-03T16:00:00.000Z");
+
+    await approveProposal(db, outcome.proposal!.id);
+    expect((await applyProposal(db, outcome.proposal!.id)).outcome).toBe("applied");
+    const links = await db.eventPerson.findMany({ where: { eventId: eventOp.entityId }, orderBy: { createdAt: "asc" } });
+    expect(new Set(links.map((l) => l.personId))).toEqual(new Set([known.id, personOp.entityId]));
+  });
+
   it("ignores a fabricated temporal literal and flags a title without evidence (finding 17)", async () => {
     const payload = "renew the parking permit";
     const capture = await newCapture(payload);

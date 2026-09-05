@@ -595,6 +595,24 @@ export async function interpretExtraction(
           skippedRefs.add(item.item_ref);
           continue;
         }
+        // Finding 19: participants — unambiguous references and proposed
+        // person items become EventPerson links; ambiguous ones are flagged.
+        const attendees = refs.many("people");
+        const eventPeopleIds = [...attendees.ids];
+        for (const ref of item.depends_on_item_refs) {
+          const dep = prepared.get(ref);
+          if (dep && dep.item.entity_type === "person" && !eventPeopleIds.includes(dep.entityId)) {
+            eventPeopleIds.push(dep.entityId);
+          }
+        }
+        if (attendees.ambiguous) {
+          warnings.push({
+            itemRef: item.item_ref,
+            message: "a participant mention matched several people; confirm who attends at review",
+            severity: "needs_confirmation",
+          });
+          confidences.push("needs_confirmation");
+        }
         // Finding 20: a range inside the start phrase ("Sept 12–14", "9am–11am")
         // is resolved as a whole; an explicit end resolves relative to the
         // start's day and is never replaced by an invented duration.
@@ -648,6 +666,7 @@ export async function interpretExtraction(
               title,
               projectId,
               captureId: input.captureId,
+              peopleIds: eventPeopleIds,
               location: str(f.location),
               notes: str(f.notes),
               confidence: "needs_confirmation",
@@ -665,6 +684,7 @@ export async function interpretExtraction(
           timezone: zone,
           projectId,
           captureId: input.captureId,
+          peopleIds: eventPeopleIds,
           location: str(f.location),
           description: str(f.description),
           notes: str(f.notes),

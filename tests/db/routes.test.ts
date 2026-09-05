@@ -195,6 +195,26 @@ describe("people, glossary, settings routes", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("creates an event with participants persisted as EventPerson rows (finding 19)", async () => {
+    const person = await db.person.create({ data: { name: "Route Attendee" } });
+    const res = await routes.eventCreate(
+      req("POST", {
+        title: "Route lunch",
+        kind: "meeting",
+        scheduleType: "fixed",
+        startAt: "2026-09-13T16:00:00Z",
+        endAt: "2026-09-13T17:00:00Z",
+        timezone: "America/New_York",
+        peopleIds: [person.id, person.id],
+      }),
+      ctx(""),
+    );
+    expect(res.status).toBe(201);
+    const event = (await res.json()) as { id: string };
+    const links = await db.eventPerson.findMany({ where: { eventId: event.id } });
+    expect(links.map((l) => l.personId)).toEqual([person.id]);
+  });
+
   it("rejects glossary targets that do not exist or live in another table (finding 18)", async () => {
     const area = await db.project.create({ data: { kind: "area", name: "Glossary Target Area" } });
     const body = (term: string, entityType: string, entityId: string) => ({
