@@ -181,6 +181,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: recovery at every process start without ownership (races an active worker); leaving recovery as library code with no caller.
 - Reason: an interrupted apply must be visible and resolvable by the user, and recovery must never clobber a worker that is still inside its transaction.
 
+## 2026-09-05 The approval endpoint is idempotent (finding 4)
+- Decision: "Accept all" approves and applies based on the proposal's current status: pending → approve then apply; approved (interrupted earlier) → apply; applied → the original Action is returned; applying → reported as in progress; any terminal status → refused with a clear message. A lost HTTP response can therefore be retried safely.
+- Rejected: requiring the client to know whether approval already happened; returning 409 for a retry of successful work.
+- Reason: the engine's apply is idempotent by key; the public wrapper must not undo that guarantee.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

@@ -87,10 +87,29 @@ export async function extractCapture(
   return processCaptureWithExtraction(db, captureId, provider, { editedPayloadText });
 }
 
-/** "Accept all": explicit approval immediately followed by transactional apply. */
-export async function approveAndApply(db: PrismaClient, proposalId: string): Promise<ApplyResult> {
-  await approveProposal(db, proposalId);
-  return applyProposal(db, proposalId);
+export type ReviewApplyResult = ApplyResult | { outcome: "in_progress" };
+
+/**
+ * "Accept all": explicit approval immediately followed by transactional
+ * apply — idempotent end to end (finding 4). A retry after a lost response
+ * returns the original Action; a proposal already approved (interrupted
+ * between approval and apply) resumes; work still inside its apply window
+ * is reported as in progress rather than failing.
+ */
+export async function approveAndApply(db: PrismaClient, proposalId: string): Promise<ReviewApplyResult> {
+  const current = await db.proposal.findUniqueOrThrow({ where: { id: proposalId } });
+  switch (current.status) {
+    case "pending":
+      await approveProposal(db, proposalId);
+      return applyProposal(db, proposalId);
+    case "approved":
+    case "applied":
+      return applyProposal(db, proposalId);
+    case "applying":
+      return { outcome: "in_progress" };
+    default:
+      throw new ProposalStateError(`This review can no longer be applied (status: ${current.status})`);
+  }
 }
 
 /** "Reject all": refuses the proposal and, unless re-extraction is wanted, the Capture. */

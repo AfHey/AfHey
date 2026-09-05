@@ -4,9 +4,10 @@
  * explicitly, and orders by reference regardless of client order.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { reviseProposal } from "@/core/captures/review";
+import { approveAndApply, reviseProposal } from "@/core/captures/review";
 import { buildProposal } from "@/core/proposals/build";
 import { ProposalStateError } from "@/core/proposals/errors";
+import { approveProposal } from "@/core/proposals/lifecycle";
 import type { PrismaClient } from "@/db/generated/client";
 import { newUuid } from "@/lib/ids";
 import { resetTestDatabase } from "../helpers/test-db";
@@ -41,6 +42,43 @@ async function linkedBatch() {
     ],
   });
 }
+
+describe("approveAndApply is retry-safe (finding 4)", () => {
+  const noteProposal = () =>
+    buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "note", after: { body: "retry me" } }],
+    });
+
+  it("a repeated request after a lost response returns the original action", async () => {
+    const proposal = await noteProposal();
+    const first = await approveAndApply(db, proposal.id);
+    const second = await approveAndApply(db, proposal.id);
+    expect(first.outcome).toBe("applied");
+    expect(second.outcome).toBe("applied");
+    if (first.outcome === "applied" && second.outcome === "applied") {
+      expect(second.action.id).toBe(first.action.id);
+    }
+    expect(await db.actionLog.count({ where: { proposalId: proposal.id } })).toBe(1);
+  });
+
+  it("resumes a proposal that was approved but never applied", async () => {
+    const proposal = await noteProposal();
+    await approveProposal(db, proposal.id);
+    const result = await approveAndApply(db, proposal.id);
+    expect(result.outcome).toBe("applied");
+  });
+
+  it("reports in-flight work instead of failing, and refuses terminal states", async () => {
+    const inFlight = await noteProposal();
+    await approveProposal(db, inFlight.id);
+    await db.proposal.update({ where: { id: inFlight.id }, data: { status: "applying" } });
+    expect(await approveAndApply(db, inFlight.id)).toEqual({ outcome: "in_progress" });
+    await db.proposal.update({ where: { id: inFlight.id }, data: { status: "rejected" } });
+    await expect(approveAndApply(db, inFlight.id)).rejects.toThrow(ProposalStateError);
+  });
+});
 
 describe("reviseProposal on linked batches (finding 5)", () => {
   it("a title edit keeps every preallocated reference valid", async () => {
