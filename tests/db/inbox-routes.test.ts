@@ -17,10 +17,10 @@ type Route = (req: Request, ctx: { params: Promise<Record<string, string>> }) =>
 const routes: Record<string, Route> = {};
 const ctx = (id = "") => ({ params: Promise.resolve({ id }) });
 
-function req(method: string, body?: unknown) {
+function req(method: string, body?: unknown, headers: Record<string, string> = {}) {
   return new Request("http://localhost/api/x", {
     method,
-    headers: { "Content-Type": "application/json", cookie },
+    headers: { "Content-Type": "application/json", cookie, ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
@@ -163,13 +163,13 @@ describe("review flow", () => {
     expect((await db.capture.findUniqueOrThrow({ where: { id: created.capture.id } })).processingStatus).toBe("rejected");
   });
 
-  it("rate-limits the extraction endpoint", async () => {
+  it("rate-limits the extraction endpoint per authenticated user even across rotating addresses", async () => {
     const created = await json<{ capture: { id: string } }>(
       await routes.captureCreate(req("POST", { text: "limit me" }), ctx()),
     );
     let last = 0;
     for (let i = 0; i < 21; i++) {
-      last = (await routes.extract(req("POST", {}), ctx(created.capture.id))).status;
+      last = (await routes.extract(req("POST", {}, { "x-forwarded-for": `10.1.1.${i}` }), ctx(created.capture.id))).status;
     }
     expect(last).toBe(429);
   });

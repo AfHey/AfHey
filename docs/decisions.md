@@ -196,6 +196,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: leaving sessions valid for their remaining lifetime after a reset.
 - Reason: a password reset is the user's response to a suspected compromise; the stolen session must die with the old password.
 
+## 2026-09-05 Rate limiting: address-independent budgets and a documented proxy boundary (finding 15)
+- Decision (product owner): keep per-address limits but do not implement proxy detection; instead document in architecture.md that per-address keys are meaningful only behind a proxy that overwrites `X-Forwarded-For` (a hosting requirement). Add budgets that hold regardless of address: the single account allows 30 login attempts per 10 minutes, and each authenticated user 20 extractions per minute. Expired limiter windows are swept so rotated keys cannot grow memory.
+- Rejected: trusting the header as-is; building proxy-configuration logic before a hosting decision exists.
+- Reason: the deployment, not the repository, defines the trusted transport; the account and user budgets bound abuse until it does.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

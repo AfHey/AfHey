@@ -8,7 +8,7 @@ import { assertSameOrigin, CsrfError } from "@/core/auth/csrf";
 import { hashSessionToken } from "@/core/auth/tokens";
 import { verifyPassword } from "@/core/auth/passwords";
 import { provisionUser } from "@/core/auth/provision";
-import { checkRateLimit, resetRateLimits } from "@/core/auth/rate-limit";
+import { checkRateLimit, rateLimitEntryCount, resetRateLimits, sweepExpiredRateLimits } from "@/core/auth/rate-limit";
 import {
   createSession,
   revokeAllSessions,
@@ -181,6 +181,18 @@ describe("login and logout routes", () => {
     expect(res.headers.get("retry-after")).toBeTruthy();
   });
 
+  it("rotating forwarded addresses cannot bypass the single-account budget (finding 15)", async () => {
+    let first429 = -1;
+    for (let i = 1; i <= 31; i++) {
+      const res = await loginRoute(loginRequest("wrong-password", { "x-forwarded-for": `10.0.${Math.floor(i / 250)}.${i % 250}` }));
+      if (res.status === 429) {
+        first429 = i;
+        break;
+      }
+    }
+    expect(first429).toBe(31);
+  });
+
   it("logout revokes the session and clears the cookie", async () => {
     const login = await loginRoute(loginRequest(PASSWORD));
     const token = login.headers.get("set-cookie")!.split(";")[0].split("=")[1];
@@ -201,5 +213,18 @@ describe("rate limiter", () => {
     expect(checkRateLimit("k", 2, 50).allowed).toBe(true);
     expect(checkRateLimit("k", 2, 50).allowed).toBe(true);
     expect(checkRateLimit("k", 2, 50).allowed).toBe(false);
+  });
+
+  it("sweeps expired windows so rotated keys cannot accumulate (finding 15)", () => {
+    const t0 = 1_000_000;
+    for (let i = 0; i < 50; i++) checkRateLimit(`spoof:${i}`, 5, 1_000, t0);
+    expect(rateLimitEntryCount()).toBe(50);
+    expect(sweepExpiredRateLimits(t0 + 500)).toBe(0);
+    expect(sweepExpiredRateLimits(t0 + 1_000)).toBe(50);
+    expect(rateLimitEntryCount()).toBe(0);
+    // The periodic sweep also runs from checkRateLimit itself.
+    checkRateLimit("a", 5, 1_000, t0);
+    checkRateLimit("b", 5, 1_000, t0 + 40_000);
+    expect(rateLimitEntryCount()).toBe(1);
   });
 });

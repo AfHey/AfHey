@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readCookie, SESSION_COOKIE, sessionCookieHeader } from "@/core/auth/cookies";
 import { assertSameOrigin, CsrfError } from "@/core/auth/csrf";
-import { checkRateLimit, clientKey } from "@/core/auth/rate-limit";
+import { checkRateLimit, clientKey, combineRateLimits } from "@/core/auth/rate-limit";
 import { verifyPassword } from "@/core/auth/passwords";
 import { createSession, validateSessionToken } from "@/core/auth/sessions";
 import { getPrisma } from "@/db/client";
@@ -10,6 +10,10 @@ const bodySchema = z.object({ password: z.string().min(1).max(1024) });
 
 const LOGIN_ATTEMPT_LIMIT = 10;
 const LOGIN_WINDOW_MS = 60_000;
+// Address-independent budget for the single account (finding 15): a caller
+// rotating forwarded addresses still runs into this.
+const ACCOUNT_ATTEMPT_LIMIT = 30;
+const ACCOUNT_WINDOW_MS = 10 * 60_000;
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -21,7 +25,10 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  const rate = checkRateLimit(clientKey(request, "login"), LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+  const rate = combineRateLimits(
+    checkRateLimit(clientKey(request, "login"), LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS),
+    checkRateLimit("login:account", ACCOUNT_ATTEMPT_LIMIT, ACCOUNT_WINDOW_MS),
+  );
   if (!rate.allowed) {
     return Response.json(
       { error: "Too many attempts; try again shortly" },

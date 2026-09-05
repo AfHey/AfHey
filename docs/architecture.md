@@ -37,3 +37,7 @@ Device/browser dictation uses platform facilities and receives no AfHey provider
 
 ## Open items
 See `/docs/product-spec.md` Section 19. Hosting/backups, the Phase 2 calendar rendering library, the exact Phase 3b text-reasoning model, and Phase 3a Tier 2 thresholds remain deliberately unresolved and must be recorded in `/docs/decisions.md` before their owning phase begins.
+
+## Deployment requirements
+
+- **Trusted proxy boundary for rate limiting.** Per-address rate limits key on the first `X-Forwarded-For` value. That is only meaningful when the app is reachable exclusively through a proxy that overwrites (not appends to) that header, or when it terminates connections itself with no forwarding headers at all. This repository does not establish such a boundary; the hosting decision (spec §19) must, and until it does the per-address limits are advisory. Independent of address, the login endpoint enforces a single-account budget and the extraction endpoint an authenticated-user budget, so spoofing the header cannot bypass rate limiting entirely (review finding 15, 2026-09-05).
