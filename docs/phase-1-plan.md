@@ -1,6 +1,6 @@
 # Phase 1 Implementation Plan
 
-**Status:** Draft awaiting product-owner approval. No implementation code is written until this plan is approved.
+**Status:** Approved 2026-08-30; **all 15 steps implemented 2026-08-30 → 2026-09-05.** Exit criteria verified (see "Completion record" at the end). Awaiting the independent Phase 1 review required by spec §15 before Phase 2 begins. Live extraction remains disabled pending product-owner approval after the accepted evaluation.
 **Date:** 2026-08-30.
 **Basis:** `product-spec.md` v1.2 (Sections 3, 6, 8–11, 13–15), `architecture.md`, and every 2026-08-30 `decisions.md` entry, including "Capture rejected status."
 
@@ -131,3 +131,17 @@ Type, paste, or device-dictate a messy non-sensitive paragraph; get schema-valid
 1. **Password-first auth:** Phase 1 ships password login only; `passkey` stays a reserved Credential kind for later. OK?
 2. **`rejected` semantics as specified above:** terminal, user-only, distinct from `failed`, 30-day retention clock from rejection. OK as written into spec v1.2?
 3. **`argon2` vs built-in `scrypt`** for password hashing (item 6).
+
+## 10. Completion record (2026-09-05)
+
+| Exit criterion (spec §15) | Evidence |
+|---|---|
+| Type, paste, or device-dictate a messy non-sensitive paragraph | Inbox composer (`e2e/inbox.spec.ts`, `e2e/exit-criteria.spec.ts`); dictated text arrives as plain text |
+| Schema-valid items with evidence and deterministic dates | `extraction-contract.ts` + `src/core/interpretation/*` (`temporal.test.ts`, `tests/db/interpretation.test.ts`); evaluation `docs/evals/eval-v1-p2-2026-09-05-openai.md` |
+| Confirm/edit them | Review cards with edit/convert/remove via superseding proposals (`tests/db/inbox-routes.test.ts`) |
+| Safely apply once | Explicit approval + transactional apply, idempotent replay (`tests/db/proposals.test.ts`) |
+| Close and reopen with everything saved | Fresh-session e2e (`e2e/exit-criteria.spec.ts`); PostgreSQL persistence |
+| Stale apply test passes | "turns a stale expected revision into conflicted with zero partial writes" |
+| Unsafe undo test passes | "a later edit makes the undo proposal conflicted", "acquired dependents block undo", "batch undo conflicts as a whole", "undo racing a concurrent edit" |
+
+Deviations from the plan, all recorded in `decisions.md`: `@prisma/adapter-pg` (required by Prisma 7); evidence spans re-anchored from quoted text (`quote` on `field_evidence`); login rate limit 10/min. Deferred inside Phase 1 scope: passkey ceremony (kind reserved), person-alias removal (archive-only tension with the global unique), scheduler-only task fields in the manual form (Phase 2 UI), undo-of-undo (not required).

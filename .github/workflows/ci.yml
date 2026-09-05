@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: afhey
+          POSTGRES_PASSWORD: afhey
+          POSTGRES_DB: afhey_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U afhey"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://afhey:afhey@localhost:5432/afhey_dev
+      TEST_DATABASE_URL: postgresql://afhey:afhey@localhost:5432/afhey_test
+      AFHEY_E2E_PASSWORD: ci-e2e-password-1
+      # Deterministic provider only; live extraction never runs in CI.
+      EXTRACTION_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create test database
+        run: PGPASSWORD=afhey psql -h localhost -U afhey -d afhey_dev -c "CREATE DATABASE afhey_test"
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Migrate and provision the dev database for e2e
+        run: |
+          npx prisma migrate deploy
+          AFHEY_PASSWORD="$AFHEY_E2E_PASSWORD" npm run provision
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: test-results

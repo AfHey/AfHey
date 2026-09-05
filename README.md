@@ -10,6 +10,10 @@ Read before working on the code:
 - `docs/phase-1-plan.md` — approved Phase 1 step plan
 - `CLAUDE.md` — non-negotiable implementation rules
 
+## Status
+
+Phase 1 (Foundation) is implemented; see `docs/phase-1-plan.md` §10 for the exit-criteria record. Live AI extraction is off by default (`EXTRACTION_PROVIDER` unset → deterministic fake); the product owner enables it after reviewing `docs/evals/`. CI (`.github/workflows/ci.yml`) runs lint, typecheck, Vitest, and Playwright against a PostgreSQL service with the fake provider.
+
 ## Prerequisites
 
 - Node.js 20.12+ (built and tested with Node 26)
