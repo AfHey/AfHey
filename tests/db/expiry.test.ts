@@ -8,6 +8,8 @@ import { DateTime } from "luxon";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createCapture } from "@/core/captures/service";
 import { interpretExtraction } from "@/core/interpretation/pipeline";
+import { applyProposal } from "@/core/proposals/apply";
+import { approveProposal } from "@/core/proposals/lifecycle";
 import type { PrismaClient } from "@/db/generated/client";
 import { runCaptureExpiry } from "@/jobs/expire-capture-text";
 import { resetTestDatabase } from "../helpers/test-db";
@@ -142,6 +144,11 @@ describe("runCaptureExpiry", () => {
       idempotencyKey: `sentinel-${sentinel}`,
     });
     expect(outcome.proposal).not.toBeNull();
+    // Apply the proposal so the ActionLog snapshot exists and the scan of
+    // action_log.operations below is real, not vacuous (verification item 8).
+    await approveProposal(db, outcome.proposal!.id);
+    expect((await applyProposal(db, outcome.proposal!.id)).outcome).toBe("applied");
+    expect(await db.actionLog.count({ where: { proposalId: outcome.proposal!.id } })).toBe(1);
     await db.capture.update({ where: { id: capture.id }, data: { rawDeleteAfter: new Date(now.getTime() - 1000) } });
     await runCaptureExpiry(db, now);
 
