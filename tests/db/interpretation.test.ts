@@ -148,6 +148,40 @@ describe("interpretExtraction", () => {
     expect(outcome.warnings.filter((w) => /recovered/.test(w.message))).toHaveLength(3);
   });
 
+  it("persists field evidence only for populated, meaningful fields (finding B)", async () => {
+    const payload = "call the plumber tomorrow";
+    const capture = await newCapture(payload);
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "task",
+          fields: { title: "call the plumber", task_kind: "action", work_type: "call the plumber" },
+          temporal_expressions: [
+            { field: "deadline", literal: "tomorrow", relation: "on", anchor_entity_id: null, evidence: evidence(17, 25), confidence: "high" },
+          ],
+          field_evidence: [
+            { field: "title", evidence: evidence(0, 16), confidence: "high" },
+            { field: "task_kind", evidence: evidence(0, 25), confidence: "medium" },
+            { field: "bucket", evidence: evidence(0, 25), confidence: "medium" },
+            { field: "is_schedulable", evidence: evidence(0, 25), confidence: "medium" },
+            { field: "work_type", evidence: evidence(0, 16), confidence: "medium" },
+            { field: "context", evidence: evidence(17, 25), confidence: "high" },
+          ],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const rows = await db.fieldEvidence.findMany({
+      where: { proposalOperationId: outcome.proposal!.operations[0].operationId },
+      orderBy: { fieldPath: "asc" },
+    });
+    expect(rows.map((r) => r.fieldPath)).toEqual(["deadline", "title"]);
+  });
+
   it("skips items with out-of-bounds evidence and anything depending on them", async () => {
     const payload = "short";
     const capture = await newCapture(payload);

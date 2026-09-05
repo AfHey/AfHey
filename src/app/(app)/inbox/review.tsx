@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DateTime } from "luxon";
 import { apiSend } from "@/lib/api";
+import { selectDisplayEvidence } from "./evidence-display";
 import type { CaptureView, InboxOptions, OperationView, ProposalView } from "./types";
 
 type EntityType = OperationView["entityType"];
@@ -87,13 +88,14 @@ function ItemMeta({ op, options }: { op: OperationView; options: InboxOptions })
   );
 }
 
-function Evidence({ op }: { op: OperationView }) {
-  if (op.evidence.length === 0) return null;
+function Evidence({ op, sourceExpired }: { op: OperationView; sourceExpired: boolean }) {
+  const shown = selectDisplayEvidence(op, sourceExpired);
+  if (shown.length === 0) return null;
   return (
     <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-ink-soft">
-      {op.evidence.map((e, i) => (
+      {shown.map((e, i) => (
         <span key={i}>
-          {e.fieldPath}: {e.literalText === null ? <em>source expired</em> : <>“{e.literalText}”</>}
+          {e.label}: {e.literal === null ? <em>source expired</em> : <>“{e.literal}”</>}
         </span>
       ))}
     </p>
@@ -447,7 +449,7 @@ function ReviewProposal({ capture, proposal, options }: { capture: CaptureView; 
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-6">{headline(op)}</p>
                 <ItemMeta op={op} options={options} />
-                <Evidence op={op} />
+                <Evidence op={op} sourceExpired={capture.sourceExpired} />
                 {op.reason && op.reason.includes(" · ") ? (
                   <p className="mt-1 text-xs text-ink-soft">{op.reason.split(" · ").slice(1).join(" · ")}</p>
                 ) : null}

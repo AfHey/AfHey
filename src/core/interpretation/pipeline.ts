@@ -138,6 +138,34 @@ function salvageTemporal(
   return { item, recovered: false };
 }
 
+const EVIDENCE_FIELD_KEYS: Record<string, string[]> = {
+  title: ["title", "name", "body"],
+  name: ["name"],
+  body: ["body"],
+  description: ["description"],
+  notes: ["notes"],
+  location: ["location"],
+  context: ["context"],
+  estimated_duration_minutes: ["estimatedDurationMinutes"],
+  task_kind: ["taskKind"],
+  event_kind: ["kind"],
+  role: ["role"],
+  proposed_priority_score: ["computedPriorityScore"],
+  work_type: ["workType"],
+  energy_level: ["energyLevel"],
+};
+
+function fieldEvidenceIsMeaningful(field: string, after: Record<string, unknown>): boolean {
+  const keys = EVIDENCE_FIELD_KEYS[field];
+  if (!keys) return false;
+  if (field === "task_kind" && after.taskKind === "action") return false;
+  if (field === "proposed_priority_score" && after.computedPriorityScore === 50) return false;
+  return keys.some((k) => {
+    const v = after[k];
+    return v !== null && v !== undefined && !(typeof v === "string" && v.trim() === "");
+  });
+}
+
 function evidenceInBounds(item: ExtractionItem, length: number): boolean {
   const spans = [
     ...item.field_evidence.map((f) => f.evidence),
@@ -644,11 +672,16 @@ export async function interpretExtraction(
   }
 
   // FieldEvidence rows: offsets index into the transmitted payload text.
+  // Field evidence is kept only for fields that actually populated the
+  // proposed item (finding B): evidence for absent or default-valued fields
+  // is noise that misleads review.
   const evidenceRows: Prisma.FieldEvidenceCreateManyInput[] = [];
   for (const [index, p] of preparedList.entries()) {
     const operation = proposal.operations[index];
     const slice = (start: number, end: number) => input.payloadText.slice(start, end);
+    const after = (p.draft.after ?? {}) as Record<string, unknown>;
     for (const fe of p.item.field_evidence) {
+      if (!fieldEvidenceIsMeaningful(fe.field, after)) continue;
       evidenceRows.push({
         proposalOperationId: operation.operationId,
         fieldPath: fe.field,
