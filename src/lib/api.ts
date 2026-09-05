@@ -3,7 +3,7 @@
 /** Client-side mutation helper: JSON in/out, readable errors. */
 export async function apiSend<T = unknown>(
   path: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown,
 ): Promise<T> {
   const res = await fetch(path, {

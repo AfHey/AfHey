@@ -2,8 +2,10 @@ import { ZodError, type ZodType } from "zod";
 import { assertSameOrigin, CsrfError } from "@/core/auth/csrf";
 import { getSessionFromRequest } from "@/core/auth/current";
 import type { ValidSession } from "@/core/auth/sessions";
+import { CaptureStateError } from "@/core/captures/service";
 import { DomainInvariantError } from "@/core/domain/invariants";
 import { RevisionConflictError } from "@/core/domain/mutations";
+import { ProposalStateError } from "@/core/proposals/errors";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 type Handler = (
@@ -49,7 +51,11 @@ export function withAuth(handler: Handler) {
           { status: 422 },
         );
       }
-      if (error instanceof RevisionConflictError) {
+      if (
+        error instanceof RevisionConflictError ||
+        error instanceof CaptureStateError ||
+        error instanceof ProposalStateError
+      ) {
         return Response.json({ error: error.message }, { status: 409 });
       }
       if (isPrismaNotFound(error)) {

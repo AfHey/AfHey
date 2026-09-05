@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePageSession } from "@/core/auth/current";
 import { Nav } from "./nav";
 
@@ -7,15 +8,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-dvh flex-col md:flex-row">
       {/* Desktop rail */}
       <aside className="hidden w-52 shrink-0 flex-col border-r border-line px-4 py-6 md:flex">
-        <span className="display px-2 pb-8 text-xl font-semibold tracking-tight">
+        <span className="display px-2 pb-6 text-xl font-semibold tracking-tight">
           AfHey
         </span>
+        <Link href="/inbox?focus=1" className="btn-ghost mb-6 justify-start">
+          + Add
+        </Link>
         <Nav orientation="vertical" />
       </aside>
 
       {/* Mobile top bar */}
       <header className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
         <span className="display text-lg font-semibold tracking-tight">AfHey</span>
+        <Link href="/inbox?focus=1" className="btn-quiet">+ Add</Link>
       </header>
 
       <div className="flex-1 pb-20 md:pb-0">

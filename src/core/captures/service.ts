@@ -9,6 +9,14 @@ import type { Capture, PrismaClient } from "@/db/generated/client";
 
 export const RAW_RETENTION_DAYS = 30;
 
+/** Illegal capture lifecycle transition (already resolved, not awaiting…). */
+export class CaptureStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CaptureStateError";
+  }
+}
+
 export function retentionDeadline(from = new Date()): Date {
   return new Date(from.getTime() + RAW_RETENTION_DAYS * 24 * 60 * 60 * 1000);
 }
@@ -37,10 +45,10 @@ export function previewRedaction(text: string): GuardResult {
 export async function processCaptureNoAi(db: PrismaClient, captureId: string) {
   return db.$transaction(async (tx) => {
     const capture = await tx.capture.findUniqueOrThrow({ where: { id: captureId } });
-    if (capture.processingStatus !== "received") {
-      throw new Error(`Capture ${captureId} is not awaiting processing`);
+    if (!["received", "redacted", "failed"].includes(capture.processingStatus)) {
+      throw new CaptureStateError(`Capture ${captureId} is not awaiting processing`);
     }
-    if (!capture.rawText) throw new Error(`Capture ${captureId} has no raw text`);
+    if (!capture.rawText) throw new CaptureStateError(`Capture ${captureId} has no raw text`);
     const note = await tx.note.create({
       data: { body: capture.rawText, captureId: capture.id, aiExcluded: true },
     });
@@ -66,7 +74,7 @@ export async function rejectCapture(db: PrismaClient, captureId: string) {
   return db.$transaction(async (tx) => {
     const capture = await tx.capture.findUniqueOrThrow({ where: { id: captureId } });
     if (["processed", "no_ai", "rejected"].includes(capture.processingStatus)) {
-      throw new Error(`Capture ${captureId} is already resolved`);
+      throw new CaptureStateError(`Capture ${captureId} is already resolved`);
     }
     return tx.capture.update({
       where: { id: capture.id },

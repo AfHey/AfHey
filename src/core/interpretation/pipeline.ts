@@ -519,12 +519,16 @@ export async function interpretExtraction(
     return { proposal: null, warnings, duplicates, skipped };
   }
 
-  // Dependency sequences: recompute against the final ordering.
+  // Dependency sequences: recompute against the final ordering. Per-item
+  // warnings ride on the operation's `reason` so the review screen can show
+  // them after any reload.
   const sequenceOf = new Map(preparedList.map((p, index) => [p.item.item_ref, index]));
   for (const p of preparedList) {
     p.draft.dependsOnSequences = p.item.depends_on_item_refs
       .map((ref) => sequenceOf.get(ref))
       .filter((s): s is number => s !== undefined);
+    const notes = warnings.filter((w) => w.itemRef === p.item.item_ref).map((w) => w.message);
+    p.draft.reason = [p.draft.reason, ...notes].filter(Boolean).join(" · ");
   }
 
   let proposal: ProposalWithOperations;

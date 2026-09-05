@@ -5,12 +5,14 @@
  * provider failure leaves the Capture `failed` with no domain mutation.
  */
 import { DateTime } from "luxon";
+import { runGuard } from "@/ai/redaction/guard";
 import type { ExtractionProvider } from "@/ai/adapters/types";
 import { interpretExtraction, type InterpretationResult } from "@/core/interpretation/pipeline";
 import { loadLexicon } from "@/core/resolution/lexicon";
 import { prepareProviderPayload } from "@/core/resolution/resolve";
 import { newUuid } from "@/lib/ids";
 import type { PrismaClient } from "@/db/generated/client";
+import { CaptureStateError } from "./service";
 
 export type ExtractionOutcome =
   | ({ status: "proposed" | "nothing_actionable" } & InterpretationResult)
@@ -20,14 +22,23 @@ export async function processCaptureWithExtraction(
   db: PrismaClient,
   captureId: string,
   provider: ExtractionProvider,
-  options: { now?: DateTime; idempotencyKey?: string } = {},
+  options: {
+    now?: DateTime;
+    idempotencyKey?: string;
+    /**
+     * User-edited redaction preview (spec §13.4). The whole edited text is
+     * guarded again before transmission; placeholders that survive keep
+     * their resolved candidates.
+     */
+    editedPayloadText?: string;
+  } = {},
 ): Promise<ExtractionOutcome> {
   const capture = await db.capture.findUniqueOrThrow({ where: { id: captureId } });
-  if (capture.processingStatus !== "received" && capture.processingStatus !== "redacted") {
-    throw new Error(`Capture ${captureId} is not awaiting extraction (${capture.processingStatus})`);
+  if (!["received", "redacted", "failed"].includes(capture.processingStatus)) {
+    throw new CaptureStateError(`Capture ${captureId} is not awaiting extraction (${capture.processingStatus})`);
   }
-  if (!capture.rawText) throw new Error(`Capture ${captureId} has no raw text`);
-  if (capture.aiExcluded) throw new Error(`Capture ${captureId} is marked ai_excluded`);
+  if (!capture.rawText) throw new CaptureStateError(`Capture ${captureId} has no raw text`);
+  if (capture.aiExcluded) throw new CaptureStateError(`Capture ${captureId} is marked ai_excluded`);
 
   const settings = await db.userSettings.findFirst();
   const zone = settings?.currentTimezone ?? "America/New_York";
@@ -35,12 +46,17 @@ export async function processCaptureWithExtraction(
 
   const lexicon = await loadLexicon(db);
   const prepared = prepareProviderPayload(capture.rawText, lexicon);
+  const payloadText =
+    options.editedPayloadText !== undefined
+      ? runGuard(options.editedPayloadText).redactedText
+      : prepared.payloadText;
+  const mentions = prepared.mentions.filter((m) => payloadText.includes(m.placeholder));
 
   await db.capture.update({
     where: { id: captureId },
     data: {
       processingStatus: "redacted",
-      redactedText: prepared.payloadText,
+      redactedText: payloadText,
       revision: { increment: 1 },
     },
   });
@@ -48,8 +64,8 @@ export async function processCaptureWithExtraction(
   let extraction;
   try {
     extraction = await provider.extract({
-      payloadText: prepared.payloadText,
-      mentions: prepared.mentions.map((m) => ({
+      payloadText,
+      mentions: mentions.map((m) => ({
         placeholder: m.placeholder,
         entityType: m.entityType,
         candidateIds: m.candidateIds,
@@ -68,7 +84,7 @@ export async function processCaptureWithExtraction(
 
   const result = await interpretExtraction(db, {
     captureId,
-    payloadText: prepared.payloadText,
+    payloadText,
     extraction,
     now,
     idempotencyKey: options.idempotencyKey ?? `capture:${captureId}:${newUuid()}`,
