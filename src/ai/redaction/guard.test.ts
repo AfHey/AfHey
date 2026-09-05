@@ -67,13 +67,27 @@ describe("false-positive damping", () => {
     expect(types("Theresa May said hello")).toEqual(["name"]);
   });
 
-  it("does not treat an imperative verb + name as a name pair, but still masks the pair that follows (eval-v2)", () => {
+  it("does not treat a clause-initial imperative verb + name as a name pair, but still masks the pair that follows (eval-v2)", () => {
     expect(detectSpans("Add Neri as a new person, then ask Neri for the quote")).toEqual([]);
     expect(detectSpans("Meet Olin on Thursday")).toEqual([]);
+    expect(detectSpans("Buy milk, then Call Ada about it. Email Bea too")).toEqual([]);
     // Rescan from the second word: the real name pair is still caught.
     const spans = detectSpans("Call Ada Byron tomorrow");
     expect(spans).toEqual([{ type: "name", start: 5, end: 14 }]);
     expect(detectSpans("Monday Ada Byron reviews")).toEqual([{ type: "name", start: 7, end: 16 }]);
+  });
+
+  it("keeps masking names that collide with command verbs outside command position (verification item 26)", () => {
+    // A label context is not a command: the colon never opens command position.
+    expect(detectSpans("Patient name: Ping Chen")).toEqual([{ type: "name", start: 14, end: 23 }]);
+    expect(detectSpans("Contact: Pay Adler, ext. 12")).toEqual([{ type: "name", start: 9, end: 18 }]);
+    // Mid-sentence, the same words are names.
+    expect(detectSpans("notes from Ping Chen about the order")).toEqual([{ type: "name", start: 11, end: 20 }]);
+    expect(detectSpans("spoke with Text Nakamura yesterday")).toEqual([{ type: "name", start: 11, end: 24 }]);
+    // Honorifics keep their own detector regardless of the verb list.
+    expect(types("Dr. Ping Chen")).toEqual(["name"]);
+    // In command position the pair after the verb is still rescanned.
+    expect(detectSpans("Ask Ping Chen about the order")).toEqual([{ type: "name", start: 4, end: 13 }]);
   });
 });
 

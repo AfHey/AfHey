@@ -42,17 +42,23 @@ const NAME_PAIR_STOPWORDS = new Set([
   ...MONTHS,
   "the", "this", "that", "next", "last", "every",
 ]);
-// Sentence-initial imperative verbs ("Add Neri", "Call Ada"): the verb is not
-// a name, and a lone first name after a lowercase verb is not masked either,
-// so this only removes a false positive that the preview could never repair
-// (edits are re-guarded in full). None of these words is a plausible given
-// name (eval-v2, 2026-09-05).
+// Clause-initial imperative verbs ("Add Neri", "Call Ada"): in command
+// position the verb is not a name, and a lone first name after a lowercase
+// verb is not masked either, so this only removes a false positive that the
+// preview could never repair (edits are re-guarded in full). The exemption
+// applies ONLY at the start of a clause (verification item 26): the same
+// words elsewhere — "Patient name: Ping Chen", "notes from Ping Chen" — stay
+// name pairs. (eval-v2, 2026-09-05)
 const LEADING_VERBS = new Set([
   "add", "ask", "book", "bring", "buy", "call", "cancel", "check", "confirm", "contact",
   "email", "finish", "follow", "invite", "meet", "message", "order", "pay", "ping", "prepare",
   "remind", "reply", "return", "review", "schedule", "send", "submit", "tell", "text", "thank",
   "update", "visit", "write",
 ]);
+// Where a command can start: the text, a sentence or clause break, a dash
+// separator, or a coordinating word. A colon is deliberately absent — it
+// introduces labels ("name:", "Attn:"), not commands.
+const COMMAND_POSITION = /(?:^|[.!?;\n]\s*|[—–-]\s+|\b(?:then|and|also|please|or)\s+)$/i;
 
 const DETECTORS: Detector[] = [
   // Labeled medical record numbers: "MRN 1234567", "MRN#: 1234567".
@@ -108,7 +114,11 @@ export function detectSpans(text: string): RedactionSpan[] {
         continue;
       }
       if (pairFilter) {
-        const verdict = classifyPair(match[0], text.slice(match.index + match[0].length, match.index + match[0].length + 6));
+        const verdict = classifyPair(
+          match[0],
+          text.slice(match.index + match[0].length, match.index + match[0].length + 6),
+          text.slice(Math.max(0, match.index - 12), match.index),
+        );
         if (verdict === "not-a-name-first-word") {
           // The first word is not a name; the second may start a real pair
           // ("Call Ada Byron" → "Ada Byron"), so rescan from it.
@@ -140,9 +150,10 @@ const HONORIFICS = new Set(["dr", "mr", "mrs", "ms", "mx", "prof", "professor"])
 
 type PairVerdict = "name" | "not-a-name-first-word" | "not-a-name";
 
-function classifyPair(match: string, following = ""): PairVerdict {
+function classifyPair(match: string, following = "", preceding = ""): PairVerdict {
   const words = match.split(/\s+/).map((w) => w.toLowerCase().replace(/\.$/, ""));
-  if (words[0] !== undefined && (NAME_PAIR_STOPWORDS.has(words[0]) || LEADING_VERBS.has(words[0]))) {
+  if (words[0] !== undefined && NAME_PAIR_STOPWORDS.has(words[0])) return "not-a-name-first-word";
+  if (words[0] !== undefined && LEADING_VERBS.has(words[0]) && COMMAND_POSITION.test(preceding)) {
     return "not-a-name-first-word";
   }
   // "Dentist February 30", "Retreat September 12", "Appointment Thursday": a

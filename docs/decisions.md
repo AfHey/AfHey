@@ -241,6 +241,12 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: advisory locks around recovery (another process to coordinate, same stale-read problem for the worker); letting the slow worker win and treating the re-approved apply as a replay (the user was told the apply failed; a later silent commit contradicts that).
 - Reason: with an execution lease, only the lease holder may write the row; everyone else must observe a miss and stop.
 
+## 2026-09-05 Verb exemption limited to command position (verification item 26)
+- Decision: the imperative-verb exemption in the name-pair detector applies only when the pair starts a clause — the start of the text, after a sentence or clause break (`.`, `!`, `?`, `;`, newline), after a dash separator, or after a coordinating word (then, and, also, please, or). A colon never opens command position, so labels keep their names: "Patient name: Ping Chen", "Contact: Pay Adler", and mid-sentence "notes from Ping Chen" are masked; "Ask Ping Chen" in command position still masks "Ping Chen" through the rescan.
+- Known limit, stated rather than hidden: a capture that opens with a person whose given name is also a command verb ("Ping Chen called") is indistinguishable from a command and is not masked by the pair rule; honorific and label contexts still catch it.
+- Rejected: the previous position-independent exemption (verification showed the label bypass); removing the exemption entirely (the redaction preview cannot repair "Add Neri" because edits are re-guarded in full).
+- Reason: the exemption exists for one syntactic situation; it must not reach any other.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
