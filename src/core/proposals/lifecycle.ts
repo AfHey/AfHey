@@ -14,10 +14,11 @@ async function expireIfDue(db: PrismaClient, proposal: Proposal): Promise<Propos
     proposal.expiresAt !== null &&
     proposal.expiresAt.getTime() <= Date.now()
   ) {
-    return db.proposal.update({
-      where: { id: proposal.id },
+    await db.proposal.updateMany({
+      where: { id: proposal.id, status: proposal.status, revision: proposal.revision },
       data: { status: "expired", revision: { increment: 1 } },
     });
+    return db.proposal.findUniqueOrThrow({ where: { id: proposal.id } });
   }
   return proposal;
 }
@@ -55,7 +56,8 @@ export async function rejectProposal(db: PrismaClient, id: string): Promise<Prop
 
 export interface RecoveryOutcome {
   proposalId: string;
-  resolvedTo: "applied" | "failed";
+  /** "skipped": the row changed under this pass (a worker finished or another pass resolved it). */
+  resolvedTo: "applied" | "failed" | "skipped";
 }
 
 /**
@@ -82,23 +84,23 @@ export async function recoverApplyingProposals(
   const outcomes: RecoveryOutcome[] = [];
   for (const proposal of stuck) {
     const action = await db.actionLog.findUnique({ where: { proposalId: proposal.id } });
-    if (action) {
-      await db.proposal.update({
-        where: { id: proposal.id },
-        data: { status: "applied", appliedAt: action.appliedAt, revision: { increment: 1 } },
-      });
-      outcomes.push({ proposalId: proposal.id, resolvedTo: "applied" });
-    } else {
-      await db.proposal.update({
-        where: { id: proposal.id },
-        data: {
-          status: "failed",
-          failureReason: `${RECOVERY_NOTE_PREFIX} no action was recorded; re-validate and re-approve`,
-          revision: { increment: 1 },
-        },
-      });
-      outcomes.push({ proposalId: proposal.id, resolvedTo: "failed" });
-    }
+    // Ownership check (verification item 3): the write lands only on the row
+    // version this pass read. A worker that finished meanwhile, or another
+    // recovery pass, changed the revision and keeps its result.
+    const claimed = await db.proposal.updateMany({
+      where: { id: proposal.id, status: "applying", revision: proposal.revision },
+      data: action
+        ? { status: "applied", appliedAt: action.appliedAt, revision: { increment: 1 } }
+        : {
+            status: "failed",
+            failureReason: `${RECOVERY_NOTE_PREFIX} no action was recorded; re-validate and re-approve`,
+            revision: { increment: 1 },
+          },
+    });
+    outcomes.push({
+      proposalId: proposal.id,
+      resolvedTo: claimed.count === 1 ? (action ? "applied" : "failed") : "skipped",
+    });
   }
   return outcomes;
 }
@@ -129,8 +131,11 @@ export async function reapproveRecoveredProposal(db: PrismaClient, id: string): 
       );
     }
   }
-  return db.proposal.update({
-    where: { id },
+  // Conditional on the row version whose operations were just verified
+  // (verification item 3): a concurrent re-approval or recovery pass wins
+  // exactly once.
+  const updated = await db.proposal.updateMany({
+    where: { id, status: "failed", revision: proposal.revision },
     data: {
       status: "approved",
       approvedAt: new Date(),
@@ -138,4 +143,8 @@ export async function reapproveRecoveredProposal(db: PrismaClient, id: string): 
       revision: { increment: 1 },
     },
   });
+  if (updated.count !== 1) {
+    throw new ProposalStateError("The proposal changed while re-approving; reload and retry");
+  }
+  return db.proposal.findUniqueOrThrow({ where: { id } });
 }

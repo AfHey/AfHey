@@ -15,6 +15,7 @@ import { applyProposal } from "@/core/proposals/apply";
 import { buildProposal } from "@/core/proposals/build";
 import { ProposalStateError, ProposalValidationError } from "@/core/proposals/errors";
 import {
+  APPLY_LEASE_MS,
   approveProposal,
   reapproveRecoveredProposal,
   recoverApplyingProposals,
@@ -23,6 +24,7 @@ import {
 import { buildUndoProposal } from "@/core/proposals/undo";
 import type { ActionLog, PrismaClient } from "@/db/generated/client";
 import { newUuid } from "@/lib/ids";
+import { withBarrierAfter } from "../helpers/barrier-db";
 import { resetTestDatabase } from "../helpers/test-db";
 
 let db: PrismaClient;
@@ -330,6 +332,86 @@ describe("applying recovery", () => {
     expect(reapproved.status).toBe("approved");
     actionOf(await applyProposal(db, preCommit.id));
     expect(await db.note.count({ where: { body: "recovered" } })).toBe(1);
+  });
+
+  it("a delayed recovery pass never overwrites a proposal that was resolved and re-approved meanwhile (verification item 3)", async () => {
+    const stale = new Date(Date.now() - 3 * 60 * 1000);
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "note", after: { body: "raced recovery" } }],
+    });
+    await approveProposal(db, proposal.id);
+    await db.proposal.update({ where: { id: proposal.id }, data: { status: "applying", updatedAt: stale } });
+
+    // Pass 1 reads the stuck row and its missing action, then parks.
+    const { db: paused, barrier } = withBarrierAfter(db, "actionLog", "findUnique");
+    const delayed = recoverApplyingProposals(paused);
+    await barrier.reached;
+    // Pass 2 resolves it, and the user re-approves, before pass 1 writes.
+    const prompt = await recoverApplyingProposals(db);
+    expect(prompt.find((o) => o.proposalId === proposal.id)?.resolvedTo).toBe("failed");
+    expect((await reapproveRecoveredProposal(db, proposal.id)).status).toBe("approved");
+    barrier.release();
+
+    const late = await delayed;
+    expect(late.find((o) => o.proposalId === proposal.id)?.resolvedTo).toBe("skipped");
+    expect((await db.proposal.findUniqueOrThrow({ where: { id: proposal.id } })).status).toBe("approved");
+    actionOf(await applyProposal(db, proposal.id));
+    expect(await db.note.count({ where: { body: "raced recovery" } })).toBe(1);
+  });
+
+  it("a worker that outlives its lease cannot commit over a recovered and re-approved proposal (verification item 3)", async () => {
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "note", after: { body: "slow worker" } }],
+    });
+    await approveProposal(db, proposal.id);
+
+    // The worker parks inside its transaction after writing the ActionLog,
+    // just before its final status write.
+    const { db: paused, barrier } = withBarrierAfter(db, "actionLog", "create");
+    const slow = applyProposal(paused, proposal.id);
+    await barrier.reached;
+    // Its lease expires (a recovery pass whose clock is past the lease) and
+    // the user re-approves the recovered proposal.
+    const recovered = await recoverApplyingProposals(db, new Date(Date.now() + APPLY_LEASE_MS + 60_000));
+    expect(recovered.find((o) => o.proposalId === proposal.id)?.resolvedTo).toBe("failed");
+    expect((await reapproveRecoveredProposal(db, proposal.id)).status).toBe("approved");
+    barrier.release();
+
+    const outcome = await slow;
+    expect(outcome.outcome).toBe("conflicted");
+    expect((await db.proposal.findUniqueOrThrow({ where: { id: proposal.id } })).status).toBe("approved");
+    expect(await db.note.count({ where: { body: "slow worker" } })).toBe(0);
+    expect(await db.actionLog.count({ where: { proposalId: proposal.id } })).toBe(0);
+
+    // The fresh apply then succeeds exactly once.
+    actionOf(await applyProposal(db, proposal.id));
+    expect(await db.note.count({ where: { body: "slow worker" } })).toBe(1);
+    expect(await db.actionLog.count({ where: { proposalId: proposal.id } })).toBe(1);
+  });
+
+  it("concurrent re-approvals of one recovered proposal succeed exactly once (verification item 3)", async () => {
+    const stale = new Date(Date.now() - 3 * 60 * 1000);
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [{ op: "create", entityType: "note", after: { body: "double reapprove" } }],
+    });
+    await approveProposal(db, proposal.id);
+    await db.proposal.update({ where: { id: proposal.id }, data: { status: "applying", updatedAt: stale } });
+    await recoverApplyingProposals(db);
+
+    const results = await Promise.allSettled([
+      reapproveRecoveredProposal(db, proposal.id),
+      reapproveRecoveredProposal(db, proposal.id),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(rejected.reason).toBeInstanceOf(ProposalStateError);
+    actionOf(await applyProposal(db, proposal.id));
   });
 });
 

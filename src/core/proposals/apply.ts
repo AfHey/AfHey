@@ -58,8 +58,8 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
     throw new ProposalStateError(`Only an approved proposal can be applied (status: ${proposal.status})`);
   }
   if (proposal.expiresAt !== null && proposal.expiresAt.getTime() <= Date.now()) {
-    await db.proposal.update({
-      where: { id: proposalId },
+    await db.proposal.updateMany({
+      where: { id: proposalId, status: "approved", revision: proposal.revision },
       data: { status: "expired", revision: { increment: 1 } },
     });
     throw new ProposalStateError("This proposal expired before it was applied");
@@ -78,6 +78,12 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
     }
     throw new ProposalStateError(`Proposal is no longer applicable (status: ${current.status})`);
   }
+  // The revision stamped by the CAS is this worker's lease (verification
+  // item 3): every later write by this worker is conditional on it, so a
+  // recovery pass that resolved the row past the lease keeps its result and
+  // this worker's transaction rolls back instead of committing over it.
+  const lease = (await db.proposal.findUniqueOrThrow({ where: { id: proposalId } })).revision;
+  const ownedRow = { id: proposal.id, status: "applying" as const, revision: lease };
 
   try {
     const action = await db.$transaction(async (tx) => {
@@ -207,28 +213,35 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
           revertsActionId: proposal.undoesActionId ?? null,
         },
       });
-      await tx.proposal.update({
-        where: { id: proposal.id },
+      const finished = await tx.proposal.updateMany({
+        where: ownedRow,
         data: { status: "applied", appliedAt: created.appliedAt, revision: { increment: 1 } },
       });
+      if (finished.count !== 1) {
+        throw new ProposalConflictError([
+          { reason: "this apply outlived its lease and was resolved by recovery; nothing was written" },
+        ]);
+      }
       return created;
     });
     return { outcome: "applied", action };
   } catch (error) {
+    // Status writes after a rollback are conditional on the lease too: a row
+    // already resolved by recovery (and possibly re-approved) is left alone.
     if (error instanceof ProposalConflictError || error instanceof DomainInvariantError) {
       const details: ConflictDetail[] =
         error instanceof ProposalConflictError
           ? error.details
           : error.violations.map((reason) => ({ reason }));
-      await db.proposal.update({
-        where: { id: proposal.id },
+      await db.proposal.updateMany({
+        where: ownedRow,
         data: { status: "conflicted", conflictDetails: toJson(details), revision: { increment: 1 } },
       });
       return { outcome: "conflicted", details };
     }
     const reason = error instanceof Error ? error.message : "unknown apply error";
-    await db.proposal.update({
-      where: { id: proposal.id },
+    await db.proposal.updateMany({
+      where: ownedRow,
       data: { status: "failed", failureReason: reason, revision: { increment: 1 } },
     });
     return { outcome: "failed", reason };

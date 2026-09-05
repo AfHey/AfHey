@@ -235,6 +235,12 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: locking the capture row for the duration of the apply (holds a lock across domain writes for no benefit); trusting the pre-write status read (the interleaving the verification described).
 - Reason: every read-then-write on shared state must be conditional on what was read; the user's later decision about a capture wins over an in-flight apply.
 
+## 2026-09-05 Recovery, re-approval, and worker completion are ownership-checked (verification item 3)
+- Decision: the revision stamped when a worker takes the `applying` window is its lease; the worker's final status write inside the apply transaction, and its conflicted/failed writes after a rollback, are conditional on that lease, so a worker that outlives its lease rolls back rather than committing over a row that recovery resolved and the user re-approved. Recovery writes are conditional on the row version the pass read (a changed row is reported as skipped), and re-approval is conditional on the verified version, so concurrent re-approvals succeed exactly once. Expiry writes follow the same rule.
+- Tests race real actors with barriers: a recovery pass parked after its reads while a second pass resolves the row and the user re-approves; a worker parked after writing its ActionLog while its lease expires and the proposal is recovered and re-approved; two simultaneous re-approvals.
+- Rejected: advisory locks around recovery (another process to coordinate, same stale-read problem for the worker); letting the slow worker win and treating the re-approved apply as a replay (the user was told the apply failed; a later silent commit contradicts that).
+- Reason: with an execution lease, only the lease holder may write the row; everyone else must observe a miss and stop.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
