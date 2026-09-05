@@ -20,9 +20,16 @@ export async function provisionUser(db: PrismaClient, password: string) {
       where: { userId: user.id, kind: "password" },
     });
     if (existing) {
+      // Password reset (finding 14): replacing the hash and invalidating
+      // every existing session commit together, so a previously stolen
+      // session dies with the old password.
       await tx.credential.update({
         where: { id: existing.id },
         data: { secretHash },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { sessionRevocationVersion: { increment: 1 } },
       });
     } else {
       await tx.credential.create({
@@ -34,6 +41,6 @@ export async function provisionUser(db: PrismaClient, password: string) {
       update: {},
       create: { userId: user.id },
     });
-    return user;
+    return tx.user.findUniqueOrThrow({ where: { id: user.id } });
   });
 }

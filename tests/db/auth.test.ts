@@ -67,7 +67,20 @@ describe("provisioning", () => {
     const cred = await db.credential.findFirstOrThrow();
     expect(await verifyPassword(cred.secretHash!, "replacement-password-2")).toBe(true);
     expect(await verifyPassword(cred.secretHash!, PASSWORD)).toBe(false);
-    await provisionUser(db, PASSWORD); // restore for later tests
+    user = await provisionUser(db, PASSWORD); // restore for later tests
+  });
+
+  it("a password reset invalidates every existing session, and a fresh login works (finding 14)", async () => {
+    const stolen = await createSession(db, user);
+    expect(await validateSessionToken(db, stolen.token)).not.toBeNull();
+
+    user = await provisionUser(db, PASSWORD); // same password, still a reset
+    expect(await validateSessionToken(db, stolen.token)).toBeNull();
+
+    // A login concurrent with / after the reset issues a session under the
+    // new revocation version and is valid.
+    const fresh = await createSession(db, user);
+    expect(await validateSessionToken(db, fresh.token)).not.toBeNull();
   });
 
   it("rejects short passwords", async () => {

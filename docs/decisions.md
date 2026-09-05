@@ -191,6 +191,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: leaving approvable proposals without evidence, or captures still eligible for a second extraction, after a mid-sequence failure.
 - Reason: a review must either exist completely or not at all.
 
+## 2026-09-05 Password reset invalidates sessions (finding 14)
+- Decision: re-provisioning with a password (the documented reset path) replaces the hash and increments the user's session-revocation version in the same transaction; every existing session is invalid immediately and the next login issues a session under the new version.
+- Rejected: leaving sessions valid for their remaining lifetime after a reset.
+- Reason: a password reset is the user's response to a suspected compromise; the stolen session must die with the old password.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
