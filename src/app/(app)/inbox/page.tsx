@@ -94,7 +94,9 @@ export default async function InboxPage() {
     timezone: settings?.currentTimezone ?? "America/New_York",
   };
 
-  const awaiting = views.filter((v) => v.review || v.undo || ["received", "redacted"].includes(v.status));
+  const awaiting = views.filter(
+    (v) => v.review || v.undo || (["received", "redacted"].includes(v.status) && !v.sourceExpired),
+  );
   const settled = views.filter((v) => !awaiting.includes(v));
 
   return (

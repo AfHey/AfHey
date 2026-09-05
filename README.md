@@ -59,6 +59,16 @@ To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey
 
 All of `lint`, `typecheck`, `test`, and (once present for the touched area) `test:e2e` run before every commit.
 
+## Maintenance jobs
+
+`npm run jobs:expire` runs the capture-text retention job (spec §9.5, §13): captures whose 30-day clock has passed lose their raw/redacted text and evidence literals (rows stay; the Inbox shows "source expired"), and captures never resolved within 30 days are discarded the same way. It is idempotent and safe to run any time. Schedule it daily — for example with `launchd` on the Mac that hosts the app, or cron:
+
+```
+15 3 * * * cd /path/to/afhey && npm run jobs:expire >> logs/expiry.log 2>&1
+```
+
+Hosting-side scheduling is decided with the hosting decision (spec §19).
+
 ## Stack versions (recorded at Step 1, 2026-08-30)
 
 Next.js 16.3.3 · React 19.2.8 · TypeScript 5 · Tailwind CSS 4 · Prisma 7.10.0 · Luxon 3.7.2 · Zod 4.5.4 · Vitest 4.1.11 · Playwright 1.62.1 · tsx 4 (dev-only)

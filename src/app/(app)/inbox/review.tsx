@@ -599,7 +599,11 @@ export function CaptureCard({ capture, options }: { capture: CaptureView; option
       {capture.review ? <ReviewProposal capture={capture} proposal={capture.review} options={options} /> : null}
       {!capture.review && capture.applied ? <UndoSection capture={capture} /> : null}
       {!capture.review && !capture.applied && ["received", "redacted", "failed"].includes(capture.status) ? (
-        <PendingCapture capture={capture} />
+        capture.sourceExpired ? (
+          <p className="text-sm text-ink-soft">This capture was never processed and its text has expired.</p>
+        ) : (
+          <PendingCapture capture={capture} />
+        )
       ) : null}
       {capture.status === "no_ai" && capture.noteId ? (
         <Link href="/notes" className="text-sm text-brass">Open in Notes →</Link>
