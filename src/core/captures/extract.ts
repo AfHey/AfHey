@@ -1,8 +1,10 @@
 /**
- * Capture → Proposal orchestration: guard + resolve, transmit through the
- * ExtractionProvider, interpret deterministically. The transmitted payload
- * is stored as Capture.redacted_text before the call (spec §9.5), and a
- * provider failure leaves the Capture `failed` with no domain mutation.
+ * Capture → Proposal orchestration: claim, guard + resolve, transmit through
+ * the ExtractionProvider, interpret deterministically. The claim (finding 2)
+ * is taken atomically before anything is transmitted and released with the
+ * final transition, so no-AI, rejection, and a second extraction cannot
+ * interleave with an in-flight one. The transmitted payload is stored as
+ * Capture.redacted_text before the call (spec §9.5).
  */
 import { DateTime } from "luxon";
 import { runGuard } from "@/ai/redaction/guard";
@@ -12,11 +14,12 @@ import { loadLexicon } from "@/core/resolution/lexicon";
 import { prepareProviderPayload } from "@/core/resolution/resolve";
 import { newUuid } from "@/lib/ids";
 import type { PrismaClient } from "@/db/generated/client";
-import { CaptureStateError } from "./service";
+import { claimCaptureForProcessing, releaseCaptureClaim } from "./service";
 
 export type ExtractionOutcome =
   | ({ status: "proposed" | "nothing_actionable" } & InterpretationResult)
-  | { status: "failed"; reason: string };
+  | { status: "failed"; reason: string }
+  | { status: "superseded"; reason: string };
 
 export async function processCaptureWithExtraction(
   db: PrismaClient,
@@ -33,12 +36,12 @@ export async function processCaptureWithExtraction(
     editedPayloadText?: string;
   } = {},
 ): Promise<ExtractionOutcome> {
-  const capture = await db.capture.findUniqueOrThrow({ where: { id: captureId } });
-  if (!["received", "redacted", "failed"].includes(capture.processingStatus)) {
-    throw new CaptureStateError(`Capture ${captureId} is not awaiting extraction (${capture.processingStatus})`);
+  const claimKey = `extract:${captureId}:${newUuid()}`;
+  const capture = await claimCaptureForProcessing(db, captureId, claimKey);
+  if (!capture.rawText) {
+    await releaseCaptureClaim(db, captureId, claimKey, { processingStatus: "failed" });
+    return { status: "failed", reason: "the capture has no text" };
   }
-  if (!capture.rawText) throw new CaptureStateError(`Capture ${captureId} has no raw text`);
-  if (capture.aiExcluded) throw new CaptureStateError(`Capture ${captureId} is marked ai_excluded`);
 
   const settings = await db.userSettings.findFirst();
   const zone = settings?.currentTimezone ?? "America/New_York";
@@ -50,50 +53,51 @@ export async function processCaptureWithExtraction(
     options.editedPayloadText !== undefined
       ? runGuard(options.editedPayloadText).redactedText
       : prepared.payloadText;
-  const mentions = prepared.mentions.filter((m) => payloadText.includes(m.placeholder));
+  const mentions = prepared.mentions
+    .filter((m) => payloadText.includes(m.placeholder))
+    .map((m) => ({
+      placeholder: m.placeholder,
+      entityType: m.entityType,
+      candidateIds: m.candidateIds,
+      confidence: m.confidence,
+    }));
 
-  await db.capture.update({
-    where: { id: captureId },
-    data: {
-      processingStatus: "redacted",
-      redactedText: payloadText,
-      revision: { increment: 1 },
-    },
+  // Store exactly what will be transmitted while we hold the claim.
+  await db.capture.updateMany({
+    where: { id: captureId, processingClaimKey: claimKey },
+    data: { processingStatus: "redacted", redactedText: payloadText, revision: { increment: 1 } },
   });
 
   let extraction;
   try {
     extraction = await provider.extract({
       payloadText,
-      mentions: mentions.map((m) => ({
-        placeholder: m.placeholder,
-        entityType: m.entityType,
-        candidateIds: m.candidateIds,
-        confidence: m.confidence,
-      })),
+      mentions,
       currentDateTime: now.toISO()!,
       timezone: zone,
+      intentKey: options.idempotencyKey ?? claimKey,
     });
   } catch (error) {
-    await db.capture.update({
-      where: { id: captureId },
-      data: { processingStatus: "failed", revision: { increment: 1 } },
-    });
+    await releaseCaptureClaim(db, captureId, claimKey, { processingStatus: "failed" });
     return { status: "failed", reason: error instanceof Error ? error.message : String(error) };
   }
 
   const result = await interpretExtraction(db, {
     captureId,
     payloadText,
-    mentions: mentions.map((m) => ({
-      placeholder: m.placeholder,
-      entityType: m.entityType,
-      candidateIds: m.candidateIds,
-      confidence: m.confidence,
-    })),
+    mentions,
     extraction,
     now,
     idempotencyKey: options.idempotencyKey ?? `capture:${captureId}:${newUuid()}`,
+    claimKey,
   });
-  return { status: result.proposal ? "proposed" : "nothing_actionable", ...result };
+  if (result.superseded) {
+    return { status: "superseded", reason: "the capture was resolved by another action while interpreting" };
+  }
+  if (!result.proposal) {
+    // Nothing actionable: release the claim, keep the capture reviewable.
+    await releaseCaptureClaim(db, captureId, claimKey, { processingStatus: "redacted" });
+    return { status: "nothing_actionable", ...result };
+  }
+  return { status: "proposed", ...result };
 }

@@ -145,19 +145,26 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
       }
 
       // Inbox linkage: successful processing resolves the Capture and starts
-      // its retention clock (spec §9.5).
+      // its retention clock (spec §9.5). A capture that was resolved another
+      // way (rejected, kept private, or already processed by a different
+      // proposal) makes this proposal conflict (finding 2).
       if (proposal.captureId) {
         const capture = await tx.capture.findUniqueOrThrow({ where: { id: proposal.captureId } });
-        if (capture.processingStatus === "proposed" || capture.processingStatus === "redacted") {
-          await tx.capture.update({
-            where: { id: capture.id },
-            data: {
-              processingStatus: "processed",
-              rawDeleteAfter: retentionDeadline(),
-              revision: { increment: 1 },
-            },
-          });
+        if (capture.processingStatus !== "proposed" && capture.processingStatus !== "redacted") {
+          throw new ProposalConflictError([
+            { reason: `the capture was already resolved (${capture.processingStatus}); this review is stale` },
+          ]);
         }
+        await tx.capture.update({
+          where: { id: capture.id },
+          data: {
+            processingStatus: "processed",
+            rawDeleteAfter: retentionDeadline(),
+            processingClaimKey: null,
+            processingClaimedAt: null,
+            revision: { increment: 1 },
+          },
+        });
       }
 
       // Undo linkage: only a still-applied original can be reverted (rule 9).

@@ -171,6 +171,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: inventing a one-hour end when the text gave one; collapsing ranges to a single day; treating every extracted deadline as soft.
 - Reason: an end or a firmness the user wrote is data the review must preserve; a default is only acceptable where the text is silent, and even then it is labeled.
 
+## 2026-09-05 Capture processing claim (finding 2)
+- Decision: Capture gains `processing_claim_key` (unique, nullable) and `processing_claimed_at`. An extraction attempt claims the capture with a compare-and-swap before anything is transmitted and releases it with the final transition (`proposed`, `failed`, or nothing-actionable → `redacted`). No-AI processing and rejection are compare-and-swaps that refuse while a claim is held; two concurrent no-AI requests yield exactly one Note. Applying a proposal whose capture is no longer `proposed`/`redacted` conflicts instead of creating items for a capture the user resolved otherwise. A claim older than ten minutes is treated as abandoned and may be taken over.
+- Rejected: read-then-write eligibility checks; an advisory lock held across the provider call; letting a late no-AI silently win after transmission.
+- Reason: the review reproduced duplicate extraction and no-AI violations from the unguarded window; a persisted claim makes the outcome deterministic and visible.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.

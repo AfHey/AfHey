@@ -484,6 +484,11 @@ model Capture {
   processingStatus CaptureProcessingStatus @default(received) @map("processing_status")
   aiExcluded       Boolean                 @default(false) @map("ai_excluded")
   rawDeleteAfter   DateTime?               @map("raw_delete_after") @db.Timestamptz(3)
+  // Processing claim (decisions.md 2026-09-05, finding 2): held by exactly
+  // one extraction attempt from before transmission until the Capture is
+  // proposed or failed; no-AI and rejection refuse while it is held.
+  processingClaimKey   String?   @unique @map("processing_claim_key")
+  processingClaimedAt  DateTime? @map("processing_claimed_at") @db.Timestamptz(3)
 
   tasks     Task[]
   events    Event[]

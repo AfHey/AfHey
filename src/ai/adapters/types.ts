@@ -20,6 +20,8 @@ export interface ExtractionInput {
   /** Current instant, ISO-8601 with offset, in the user's timezone. */
   currentDateTime: string;
   timezone: string;
+  /** Stable intent identifier for this attempt, forwarded to the provider as metadata. */
+  intentKey?: string;
 }
 
 /**

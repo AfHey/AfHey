@@ -48,6 +48,8 @@ export interface InterpretationInput {
   /** Current instant in the user's current timezone. */
   now: DateTime;
   idempotencyKey: string;
+  /** Processing claim held by the caller; the capture transition requires it. */
+  claimKey?: string;
 }
 
 export interface InterpretationResult {
@@ -55,6 +57,8 @@ export interface InterpretationResult {
   warnings: InterpretationWarning[];
   duplicates: DuplicateWarning[];
   skipped: Array<{ itemRef: string; reason: string }>;
+  /** True when the capture was resolved by someone else and the proposal was voided. */
+  superseded?: boolean;
 }
 
 const TASK_KINDS = new Set(["action", "waiting_for", "reminder"]);
@@ -874,14 +878,30 @@ export async function interpretExtraction(
   }
   if (evidenceRows.length > 0) await db.fieldEvidence.createMany({ data: evidenceRows });
 
-  await db.capture.updateMany({
-    where: { id: input.captureId, processingStatus: { in: ["received", "redacted"] } },
+  // Capture transition is conditional on still holding the claim (finding 2);
+  // losing it means another action resolved the capture meanwhile, so the
+  // just-built proposal is voided rather than left applicable.
+  const transitioned = await db.capture.updateMany({
+    where: {
+      id: input.captureId,
+      processingStatus: { in: ["received", "redacted"] },
+      ...(input.claimKey ? { processingClaimKey: input.claimKey } : {}),
+    },
     data: {
       processingStatus: "proposed",
       redactedText: input.payloadText,
+      processingClaimKey: null,
+      processingClaimedAt: null,
       revision: { increment: 1 },
     },
   });
+  if (transitioned.count !== 1) {
+    await db.proposal.update({
+      where: { id: proposal.id },
+      data: { status: "superseded", revision: { increment: 1 } },
+    });
+    return { proposal: null, warnings, duplicates, skipped, superseded: true };
+  }
 
   return { proposal, warnings, duplicates, skipped };
 }
