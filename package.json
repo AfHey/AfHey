@@ -16,6 +16,7 @@
     "extraction:smoke": "tsx scripts/extraction-smoke.ts",
     "jobs:expire": "tsx scripts/run-expiry.ts",
     "eval:extraction": "tsx scripts/run-extraction-eval.ts",
+    "eval:pipeline": "tsx scripts/run-pipeline-eval.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

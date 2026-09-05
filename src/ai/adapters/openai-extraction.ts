@@ -41,7 +41,8 @@ export function createOpenAIClient(apiKey: string): OpenAI {
   return new OpenAI({ apiKey, ...PROVIDER_CLIENT_OPTIONS });
 }
 
-function defaultTransport(apiKey: string): ExtractionTransport {
+/** The real Responses API transport; exported so evaluations can wrap and observe it. */
+export function createOpenAITransport(apiKey: string): ExtractionTransport {
   const client = createOpenAIClient(apiKey);
   return async ({ model, systemPrompt, userContent, intentKey }) => {
     const response = await client.responses.create({
@@ -79,7 +80,7 @@ export class OpenAIExtractionProvider implements ExtractionProvider {
     if (!options.transport && !options.apiKey) {
       throw new ExtractionProviderError("OpenAI extraction needs an API key");
     }
-    this.transport = options.transport ?? defaultTransport(options.apiKey!);
+    this.transport = options.transport ?? createOpenAITransport(options.apiKey!);
     this.sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.now = options.now ?? (() => Date.now());
   }
