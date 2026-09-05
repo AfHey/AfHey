@@ -145,13 +145,66 @@ export async function reviseProposal(
   }
   if (edits.length === 0) throw new ProposalStateError("Remove the whole proposal by rejecting it instead");
   const sourceById = new Map(current.operations.map((o) => [o.operationId, o]));
-  const operations: DraftOperation[] = edits.map((edit) => ({
-    op: "create",
-    entityType: edit.entityType,
-    after: edit.after,
-    dependsOnSequences: edit.dependsOn,
-    reason: edit.sourceOperationId ? sourceById.get(edit.sourceOperationId)?.reason ?? undefined : "added at review",
-  }));
+
+  // Finding 5 (2026-09-05): edited creates keep their preallocated entity
+  // ids so references between items stay valid; references to an item the
+  // user removed must be resolved explicitly rather than silently dropped.
+  const keptSourceIds = new Set(edits.map((e) => e.sourceOperationId).filter(Boolean));
+  const removedEntityIds = new Set(
+    current.operations.filter((o) => !keptSourceIds.has(o.operationId)).map((o) => o.entityId),
+  );
+  const referencedIds = (after: unknown): string[] => {
+    const a = (after ?? {}) as Record<string, unknown>;
+    return [a.projectId, a.waitingForPersonId, ...(Array.isArray(a.peopleIds) ? a.peopleIds : [])].filter(
+      (v): v is string => typeof v === "string",
+    );
+  };
+  for (const edit of edits) {
+    const dangling = referencedIds(edit.after).filter((id) => removedEntityIds.has(id));
+    if (dangling.length > 0) {
+      const title = String((edit.after as { title?: string; name?: string; body?: string })?.title ?? (edit.after as { name?: string })?.name ?? "an item");
+      throw new ProposalStateError(
+        `"${title}" still refers to an item you removed; change or remove it first`,
+      );
+    }
+  }
+
+  // Order edits so every referenced create comes first (references imply
+  // dependencies regardless of the order the client sent).
+  const entityIdOf = (edit: EditedOperation) =>
+    edit.sourceOperationId ? sourceById.get(edit.sourceOperationId)?.entityId : undefined;
+  const indexByEntityId = new Map<string, number>();
+  edits.forEach((edit, i) => {
+    const id = entityIdOf(edit);
+    if (id) indexByEntityId.set(id, i);
+  });
+  const deps = edits.map((edit, i) => {
+    const derived = referencedIds(edit.after)
+      .map((id) => indexByEntityId.get(id))
+      .filter((j): j is number => j !== undefined && j !== i);
+    return new Set([...edit.dependsOn, ...derived]);
+  });
+  const ordered: number[] = [];
+  const placed = new Set<number>();
+  while (ordered.length < edits.length) {
+    const next = edits.findIndex((_, i) => !placed.has(i) && [...deps[i]].every((d) => placed.has(d)));
+    if (next === -1) throw new ProposalStateError("Items reference each other in a circle; fix the references first");
+    ordered.push(next);
+    placed.add(next);
+  }
+  const newIndex = new Map(ordered.map((original, position) => [original, position]));
+
+  const operations: DraftOperation[] = ordered.map((i) => {
+    const edit = edits[i];
+    return {
+      op: "create",
+      entityType: edit.entityType,
+      entityId: entityIdOf(edit),
+      after: edit.after,
+      dependsOnSequences: [...deps[i]].map((d) => newIndex.get(d)!).sort((a, b) => a - b),
+      reason: edit.sourceOperationId ? sourceById.get(edit.sourceOperationId)?.reason ?? undefined : "added at review",
+    };
+  });
   const next = await buildProposal(db, {
     origin: current.origin,
     idempotencyKey: `revise:${proposalId}:${newUuid()}`,
@@ -159,8 +212,8 @@ export async function reviseProposal(
     supersedesProposalId: proposalId,
     operations,
   });
-  const carried = edits
-    .map((edit, index) => ({ edit, op: next.operations[index] }))
+  const carried = ordered
+    .map((i, position) => ({ edit: edits[i], op: next.operations[position] }))
     .filter(({ edit }) => edit.sourceOperationId && sourceById.has(edit.sourceOperationId));
   for (const { edit, op } of carried) {
     const rows = await db.fieldEvidence.findMany({ where: { proposalOperationId: edit.sourceOperationId } });
