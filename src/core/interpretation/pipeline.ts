@@ -8,6 +8,7 @@
  */
 import type { DateTime } from "luxon";
 import type { ExtractionItem, ExtractionResult } from "@/ai/adapters/extraction-contract";
+import type { ResolutionMention } from "@/ai/adapters/types";
 import type { Confidence } from "@/core/domain/enums";
 import type {
   EventCreateInput,
@@ -21,6 +22,7 @@ import { ProposalValidationError } from "@/core/proposals/errors";
 import { newUuid } from "@/lib/ids";
 import type { Prisma, PrismaClient } from "@/db/generated/client";
 import { findDuplicates, type DuplicateCandidate, type DuplicateWarning } from "./duplicates";
+import { fieldEvidenceIsMeaningful } from "./evidence-fields";
 import { detectTemporalPhrases, resolveTemporal, type TemporalResolution } from "./temporal";
 
 export interface InterpretationWarning {
@@ -34,6 +36,8 @@ export interface InterpretationInput {
   captureId: string;
   /** The exact guarded payload transmitted to the provider. */
   payloadText: string;
+  /** The exact candidate map transmitted with it; references outside it are dropped. */
+  mentions: ResolutionMention[];
   extraction: ExtractionResult;
   /** Current instant in the user's current timezone. */
   now: DateTime;
@@ -138,32 +142,86 @@ function salvageTemporal(
   return { item, recovered: false };
 }
 
-const EVIDENCE_FIELD_KEYS: Record<string, string[]> = {
-  title: ["title", "name", "body"],
-  name: ["name"],
-  body: ["body"],
-  description: ["description"],
-  notes: ["notes"],
-  location: ["location"],
-  context: ["context"],
-  estimated_duration_minutes: ["estimatedDurationMinutes"],
-  task_kind: ["taskKind"],
-  event_kind: ["kind"],
-  role: ["role"],
-  proposed_priority_score: ["computedPriorityScore"],
-  work_type: ["workType"],
-  energy_level: ["energyLevel"],
+const REFERENCE_FIELD_TYPE: Record<string, "person" | "project"> = {
+  people: "person",
+  waiting_for_person_id: "person",
+  project_id: "project",
+  project: "project",
 };
 
-function fieldEvidenceIsMeaningful(field: string, after: Record<string, unknown>): boolean {
-  const keys = EVIDENCE_FIELD_KEYS[field];
-  if (!keys) return false;
-  if (field === "task_kind" && after.taskKind === "action") return false;
-  if (field === "proposed_priority_score" && after.computedPriorityScore === 50) return false;
-  return keys.some((k) => {
-    const v = after[k];
-    return v !== null && v !== undefined && !(typeof v === "string" && v.trim() === "");
+/**
+ * Trusted-candidate enforcement (finding 16, 2026-09-05). The provider may
+ * only reference ids trusted code supplied for the matching entity type, and
+ * may not narrow an ambiguous placeholder to one candidate: such a reference
+ * is widened back to the full candidate set with needs_confirmation.
+ * Anchor ids that were never supplied are dropped.
+ */
+function enforceSuppliedCandidates(
+  item: ExtractionItem,
+  mentions: ResolutionMention[],
+): { item: ExtractionItem; problems: string[] } {
+  const problems: string[] = [];
+  const supplied = new Set(mentions.flatMap((m) => m.candidateIds));
+  const byType = { person: new Set<string>(), project: new Set<string>() };
+  for (const m of mentions) for (const id of m.candidateIds) byType[m.entityType].add(id);
+
+  const references = item.entity_references.flatMap((ref) => {
+    const wantType = REFERENCE_FIELD_TYPE[ref.field];
+    if (!wantType) {
+      if (ref.candidate_ids.length > 0) problems.push(`reference field "${ref.field}" is not recognized; dropped`);
+      return [];
+    }
+    const kept = ref.candidate_ids.filter((id) => byType[wantType].has(id));
+    if (kept.length < ref.candidate_ids.length) {
+      problems.push(`a ${ref.field} reference pointed at an id that was not offered; dropped`);
+    }
+    if (kept.length === 0) {
+      return ref.unresolved_literal !== null ? [{ ...ref, candidate_ids: [] }] : [];
+    }
+    // Widen a narrowed ambiguous placeholder back to its full candidate set.
+    const home = mentions.find(
+      (m) => m.entityType === wantType && m.candidateIds.length > 1 && kept.every((id) => m.candidateIds.includes(id)),
+    );
+    if (home && kept.length < home.candidateIds.length) {
+      problems.push(`an ambiguous ${wantType} mention was narrowed by the provider; all candidates restored`);
+      return [{ ...ref, candidate_ids: [...home.candidateIds], confidence: "needs_confirmation" as const }];
+    }
+    return [{ ...ref, candidate_ids: kept }];
   });
+
+  const temporal = item.temporal_expressions.map((t) => {
+    if (t.anchor_entity_id !== null && !supplied.has(t.anchor_entity_id)) {
+      problems.push("a temporal anchor pointed at an id that was not offered; dropped");
+      return { ...t, anchor_entity_id: null };
+    }
+    return t;
+  });
+  return { item: { ...item, entity_references: references, temporal_expressions: temporal }, problems };
+}
+
+/**
+ * Evidence integrity (finding 17, 2026-09-05): a temporal phrase whose span
+ * does not actually contain the phrase is fabricated or unlocatable and is
+ * discarded (no authoritative date from it); zero-length field evidence is
+ * discarded; source-derived titles need at least one real evidence span.
+ */
+function enforceEvidenceIntegrity(
+  item: ExtractionItem,
+  payloadText: string,
+): { item: ExtractionItem; problems: string[]; titleCovered: boolean } {
+  const problems: string[] = [];
+  const lower = payloadText.toLowerCase();
+  const spanHolds = (start: number, end: number, literal: string) =>
+    end > start && lower.slice(start, end).includes(literal.toLowerCase().trim());
+
+  const temporal = item.temporal_expressions.filter((t) => {
+    if (spanHolds(t.evidence.start, t.evidence.end, t.literal)) return true;
+    problems.push("a date phrase could not be matched to the source and was ignored");
+    return false;
+  });
+  const fieldEvidence = item.field_evidence.filter((f) => f.evidence.end > f.evidence.start);
+  const titleCovered = fieldEvidence.some((f) => ["title", "name", "body"].includes(f.field));
+  return { item: { ...item, temporal_expressions: temporal, field_evidence: fieldEvidence }, problems, titleCovered };
 }
 
 /** Strips any source-derived wording from a resolution before persistence. */
@@ -250,13 +308,20 @@ export async function interpretExtraction(
   const zone = input.now.zoneName!;
 
   const inBounds: ExtractionItem[] = [];
+  const uncoveredTitles = new Set<string>();
   for (const rawItem of input.extraction.items) {
     if (!evidenceInBounds(rawItem, input.payloadText.length)) {
       skipped.push({ itemRef: rawItem.item_ref, reason: "evidence span outside the capture text" });
       continue;
     }
+    const trusted = enforceSuppliedCandidates(rawItem, input.mentions);
+    const integrity = enforceEvidenceIntegrity(trusted.item, input.payloadText);
+    for (const message of [...trusted.problems, ...integrity.problems]) {
+      warnings.push({ itemRef: rawItem.item_ref, message, severity: "needs_confirmation" });
+    }
+    if (!integrity.titleCovered) uncoveredTitles.add(rawItem.item_ref);
     const salvage = salvageTemporal(
-      rawItem,
+      integrity.item,
       input.payloadText,
       rawItem.entity_type === "event" ? "start" : "deadline",
     );
@@ -311,6 +376,14 @@ export async function interpretExtraction(
       ...item.entity_references.map((r) => r.confidence),
       ...item.temporal_expressions.map((t) => t.confidence),
     ];
+    if (uncoveredTitles.has(item.item_ref) && warnings.every((w) => !(w.itemRef === item.item_ref && /source evidence/.test(w.message)))) {
+      warnings.push({
+        itemRef: item.item_ref,
+        message: "no source evidence for the title; confirm it is really in the capture",
+        severity: "needs_confirmation",
+      });
+      confidences.push("needs_confirmation");
+    }
     const dependencyOf = (type: "project" | "person") =>
       item.depends_on_item_refs
         .map((ref) => prepared.get(ref))

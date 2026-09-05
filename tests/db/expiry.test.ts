@@ -118,6 +118,7 @@ describe("runCaptureExpiry", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: {
         schema_version: "1",
         prompt_version: "test",

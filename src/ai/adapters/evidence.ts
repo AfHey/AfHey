@@ -21,6 +21,11 @@ function occurrences(haystack: string, needle: string): number[] {
   return found;
 }
 
+/**
+ * Re-anchors a span to its literal. An unlocatable literal collapses the
+ * span to zero length (finding 17): downstream treats that as "no
+ * justification", never as a valid offset.
+ */
 function snap(
   payload: string,
   literal: string,
@@ -28,7 +33,10 @@ function snap(
 ): { start: number; end: number } {
   const trimmed = literal.trim();
   const starts = occurrences(payload, trimmed);
-  if (starts.length === 0) return evidence;
+  if (starts.length === 0) {
+    const anchor = Math.max(0, Math.min(evidence.start, payload.length));
+    return { start: anchor, end: anchor };
+  }
   const nearest = starts.reduce((best, s) =>
     Math.abs(s - evidence.start) < Math.abs(best - evidence.start) ? s : best,
   );

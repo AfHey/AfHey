@@ -88,6 +88,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction,
       now,
       idempotencyKey: nextKey(),
@@ -134,6 +135,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         slipped("item-1", "call the plumber", "Tomorrow", 9),
         slipped("item-2", "order printer ink", "Tomorrow", 27),
@@ -155,6 +157,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({
           item_ref: "item-1",
@@ -189,6 +192,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({
           item_ref: "item-1",
@@ -237,6 +241,9 @@ describe("interpretExtraction", () => {
     const ambiguous = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [
+        { placeholder: "[PERSON_1]", entityType: "person", candidateIds: [a.id, b.id], confidence: "needs_confirmation" },
+      ],
       extraction: build([a.id, b.id]),
       now,
       idempotencyKey: nextKey(),
@@ -250,6 +257,7 @@ describe("interpretExtraction", () => {
     const resolved = await interpretExtraction(db, {
       captureId: capture2.id,
       payloadText: payload,
+      mentions: [{ placeholder: "[PERSON_1]", entityType: "person", candidateIds: [a.id], confidence: "high" }],
       extraction: build([a.id]),
       now,
       idempotencyKey: nextKey(),
@@ -258,12 +266,83 @@ describe("interpretExtraction", () => {
     expect(op2).toMatchObject({ taskKind: "waiting_for", waitingForPersonId: a.id });
   });
 
+  it("drops references to ids that were never offered and restores narrowed ambiguity (finding 16)", async () => {
+    const offered = await db.person.create({ data: { name: "Offered Person" } });
+    const twinA = await db.person.create({ data: { name: "Twin A" } });
+    const twinB = await db.person.create({ data: { name: "Twin B" } });
+    const existingButUnoffered = await db.person.create({ data: { name: "Existing Unoffered" } });
+    const payload = "ask [PERSON_1] and [PERSON_2] about the order";
+    const capture = await newCapture(payload);
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [
+        { placeholder: "[PERSON_1]", entityType: "person", candidateIds: [offered.id], confidence: "high" },
+        { placeholder: "[PERSON_2]", entityType: "person", candidateIds: [twinA.id, twinB.id], confidence: "needs_confirmation" },
+      ],
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "task",
+          fields: { title: "ask about the order" },
+          entity_references: [
+            { field: "people", candidate_ids: [offered.id], unresolved_literal: null, evidence: evidence(4, 14), confidence: "high" },
+            // Provider narrowed an ambiguous placeholder to one candidate.
+            { field: "people", candidate_ids: [twinA.id], unresolved_literal: null, evidence: evidence(19, 29), confidence: "high" },
+            // Provider invented a reference to a real but unoffered record.
+            { field: "people", candidate_ids: [existingButUnoffered.id], unresolved_literal: null, evidence: evidence(0, 3), confidence: "high" },
+          ],
+          field_evidence: [{ field: "title", evidence: evidence(0, 3), confidence: "high" }],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const after = outcome.proposal!.operations[0].after as { peopleIds: string[]; confidence: string };
+    expect(after.peopleIds).toEqual([offered.id]);
+    expect(after.confidence).toBe("needs_confirmation");
+    expect(outcome.warnings.some((w) => /not offered/.test(w.message))).toBe(true);
+    expect(outcome.warnings.some((w) => /narrowed/.test(w.message))).toBe(true);
+    expect(outcome.warnings.some((w) => /several people/.test(w.message))).toBe(true);
+  });
+
+  it("ignores a fabricated temporal literal and flags a title without evidence (finding 17)", async () => {
+    const payload = "renew the parking permit";
+    const capture = await newCapture(payload);
+    const outcome = await interpretExtraction(db, {
+      captureId: capture.id,
+      payloadText: payload,
+      mentions: [],
+      extraction: result([
+        item({
+          item_ref: "item-1",
+          entity_type: "task",
+          fields: { title: "renew the parking permit" },
+          temporal_expressions: [
+            // In-bounds span that does not contain the claimed phrase.
+            { field: "deadline", literal: "tomorrow", relation: "on", anchor_entity_id: null, evidence: evidence(0, 5), confidence: "high" },
+          ],
+          field_evidence: [{ field: "title", evidence: evidence(3, 3), confidence: "high" }],
+        }),
+      ]),
+      now,
+      idempotencyKey: nextKey(),
+    });
+    const after = outcome.proposal!.operations[0].after as Record<string, unknown>;
+    expect(after.deadlineDate).toBeUndefined();
+    expect(after.confidence).toBe("needs_confirmation");
+    expect(outcome.warnings.some((w) => /could not be matched/.test(w.message))).toBe(true);
+    expect(outcome.warnings.some((w) => /no source evidence for the title/.test(w.message))).toBe(true);
+    expect(await db.fieldEvidence.count({ where: { proposalOperationId: outcome.proposal!.operations[0].operationId } })).toBe(0);
+  });
+
   it("leaves a vague deadline empty with a needs_confirmation warning and suggestions", async () => {
     const payload = "finish the slides next week";
     const capture = await newCapture(payload);
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({
           item_ref: "item-1",
@@ -279,6 +358,7 @@ describe("interpretExtraction", () => {
               confidence: "medium",
             },
           ],
+          field_evidence: [{ field: "title", evidence: evidence(0, 17), confidence: "high" }],
         }),
       ]),
       now,
@@ -287,7 +367,7 @@ describe("interpretExtraction", () => {
     const after = outcome.proposal!.operations[0].after as Record<string, unknown>;
     expect(after.deadlineDate).toBeUndefined();
     expect(after.confidence).toBe("needs_confirmation");
-    expect(outcome.warnings[0].message).toMatch(/2026-09-07, 2026-09-11/);
+    expect(outcome.warnings.some((w) => /2026-09-07, 2026-09-11/.test(w.message))).toBe(true);
   });
 
   it("builds timed and all-day events, downgrading a timeless event to a task", async () => {
@@ -304,6 +384,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({
           item_ref: "item-1",
@@ -342,6 +423,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({ item_ref: "item-1", entity_type: "task", fields: { title: "order backsplash tile" } }),
       ]),
@@ -359,6 +441,7 @@ describe("interpretExtraction", () => {
     const outcome = await interpretExtraction(db, {
       captureId: capture.id,
       payloadText: payload,
+      mentions: [],
       extraction: result([
         item({
           item_ref: "item-1",

@@ -85,6 +85,12 @@ export async function processCaptureWithExtraction(
   const result = await interpretExtraction(db, {
     captureId,
     payloadText,
+    mentions: mentions.map((m) => ({
+      placeholder: m.placeholder,
+      entityType: m.entityType,
+      candidateIds: m.candidateIds,
+      confidence: m.confidence,
+    })),
     extraction,
     now,
     idempotencyKey: options.idempotencyKey ?? `capture:${captureId}:${newUuid()}`,

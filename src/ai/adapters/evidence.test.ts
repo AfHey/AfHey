@@ -39,11 +39,11 @@ describe("snapEvidence", () => {
     expect(snapped.field_evidence[1].evidence).toEqual({ start: 0, end: 5 });
   });
 
-  it("leaves spans alone when the literal is not in the payload", () => {
+  it("collapses the span to zero length when the literal is not in the payload", () => {
     const snapped = snapEvidence(
       { schema_version: "1", prompt_version: "t", items: [{ ...item, temporal_expressions: [{ ...item.temporal_expressions[0], literal: "yesterday" }] }] },
       { payloadText: payload, mentions: [], currentDateTime: "2026-09-01T09:00:00-04:00", timezone: "America/New_York" },
     ).items[0];
-    expect(snapped.temporal_expressions[0].evidence).toEqual({ start: 30, end: 38 });
+    expect(snapped.temporal_expressions[0].evidence).toEqual({ start: 30, end: 30 });
   });
 });

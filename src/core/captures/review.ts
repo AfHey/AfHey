@@ -7,6 +7,7 @@
  */
 import type { ExtractionProvider } from "@/ai/adapters/types";
 import type { CaptureSourceType, EntityType } from "@/core/domain/enums";
+import { EVIDENCE_FIELD_KEYS } from "@/core/interpretation/evidence-fields";
 import { loadLexicon } from "@/core/resolution/lexicon";
 import { prepareProviderPayload, type PreparedPayload } from "@/core/resolution/resolve";
 import { applyProposal, type ApplyResult } from "@/core/proposals/apply";
@@ -216,7 +217,19 @@ export async function reviseProposal(
     .map((i, position) => ({ edit: edits[i], op: next.operations[position] }))
     .filter(({ edit }) => edit.sourceOperationId && sourceById.has(edit.sourceOperationId));
   for (const { edit, op } of carried) {
-    const rows = await db.fieldEvidence.findMany({ where: { proposalOperationId: edit.sourceOperationId } });
+    const source = sourceById.get(edit.sourceOperationId!)!;
+    const before = (source.after ?? {}) as Record<string, unknown>;
+    const after = (edit.after ?? {}) as Record<string, unknown>;
+    // Evidence follows a field only while the field still says what the
+    // source said (finding 17): a user edit is not source-supported.
+    const unchanged = (fieldPath: string) => {
+      const keys = EVIDENCE_FIELD_KEYS[fieldPath];
+      if (!keys || edit.entityType !== source.entityType) return false;
+      return keys.every((k) => JSON.stringify(before[k] ?? null) === JSON.stringify(after[k] ?? null));
+    };
+    const rows = (await db.fieldEvidence.findMany({ where: { proposalOperationId: edit.sourceOperationId } })).filter(
+      (r) => unchanged(r.fieldPath),
+    );
     if (rows.length > 0) {
       await db.fieldEvidence.createMany({
         data: rows.map((r) => ({

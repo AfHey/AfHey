@@ -73,6 +73,35 @@ describe("reviseProposal on linked batches (finding 5)", () => {
     expect((await db.proposal.findUniqueOrThrow({ where: { id: proposal.id } })).status).toBe("pending");
   });
 
+  it("carries evidence only for fields the edit left unchanged (finding 17)", async () => {
+    const proposal = await buildProposal(db, {
+      origin: "inbox",
+      idempotencyKey: nextKey(),
+      operations: [
+        { op: "create", entityType: "task", after: { title: "order fabric", deadlineDate: "2026-09-12", deadlineType: "soft" } },
+      ],
+    });
+    const op = proposal.operations[0];
+    await db.fieldEvidence.createMany({
+      data: [
+        { proposalOperationId: op.operationId, fieldPath: "title", startOffset: 0, endOffset: 12, literalText: "order fabric", confidence: "high" },
+        { proposalOperationId: op.operationId, fieldPath: "deadline", startOffset: 13, endOffset: 25, literalText: "September 12", confidence: "high" },
+      ],
+    });
+    const revised = await reviseProposal(db, proposal.id, [
+      {
+        sourceOperationId: op.operationId,
+        entityType: "task",
+        after: { ...(op.after as object), title: "order fabric samples" },
+        dependsOn: [],
+      },
+    ]);
+    const carried = await db.fieldEvidence.findMany({
+      where: { proposalOperationId: revised.operations[0].operationId },
+    });
+    expect(carried.map((r) => r.fieldPath)).toEqual(["deadline"]);
+  });
+
   it("orders items by reference even when the client sends dependents first", async () => {
     const proposal = await linkedBatch();
     const [projectOp, personOp, taskOp] = proposal.operations;

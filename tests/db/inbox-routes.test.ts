@@ -119,16 +119,19 @@ describe("review flow", () => {
       req("PUT", {
         operations: [
           { sourceOperationId: first.operationId, entityType: "note", after: { body: "call the tile shop", captureId: first.after.captureId }, dependsOn: [] },
-          { sourceOperationId: second.operationId, entityType: "task", after: { ...second.after, title: "book the plumber (edited)" }, dependsOn: [] },
+          // Title unchanged, bucket changed: title evidence must carry over,
+          // and nothing else about the item is source-supported anymore.
+          { sourceOperationId: second.operationId, entityType: "task", after: { ...second.after, bucket: "backlog" }, dependsOn: [] },
         ],
       }),
       ctx(proposal.id),
     );
     expect(res.status).toBe(200);
-    const next = await json<{ id: string; supersedesProposalId: string; operations: Array<{ entityType: string; after: { title?: string } }> }>(res);
+    const next = await json<{ id: string; supersedesProposalId: string; operations: Array<{ entityType: string; after: { title?: string; bucket?: string } }> }>(res);
     expect(next.supersedesProposalId).toBe(proposal.id);
     expect(next.operations.map((o) => o.entityType)).toEqual(["note", "task"]);
-    expect(next.operations[1].after.title).toBe("book the plumber (edited)");
+    expect(next.operations[1].after.bucket).toBe("backlog");
+    expect(next.operations[1].after.title).toBe("book the plumber");
     expect((await db.proposal.findUniqueOrThrow({ where: { id: proposal.id } })).status).toBe("superseded");
     const carried = await db.fieldEvidence.count({ where: { proposalOperationId: (await db.proposalOperation.findFirstOrThrow({ where: { proposalId: next.id, sequence: 1 } })).operationId } });
     expect(carried).toBeGreaterThan(0);

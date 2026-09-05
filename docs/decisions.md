@@ -156,6 +156,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: extending the expiry job to scrub free-text reasons and metadata forever (fragile, and audit records must not be edited); leaving existing copies in place.
 - Reason: the guard is a last-resort detector, so any fragment that slipped through must fall under the same retention as the raw text.
 
+## 2026-09-05 Provider references and evidence are validated against what was transmitted (findings 16, 17)
+- Decision: interpretation receives the exact candidate map that was sent. A reference is kept only if every id was offered for that field's entity type; an ambiguous placeholder the provider narrowed is widened back to its full candidate set with `needs_confirmation`; anchors never offered are dropped. A temporal phrase whose span does not contain the phrase is discarded (no authoritative date from it); zero-length field evidence is discarded; an unlocatable quote collapses its span to zero length rather than keeping stale offsets; a source-derived title without evidence marks the item `needs_confirmation`. Review edits carry evidence only for fields whose value the edit left unchanged.
+- Rejected: trusting database existence as authorization for a reference; treating in-bounds offsets as justification; copying evidence onto user-edited values.
+- Reason: the model may only choose among what trusted code offered (spec §14.1), and evidence must justify the specific field it is attached to.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
