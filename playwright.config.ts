@@ -1,5 +1,6 @@
 import { loadEnvFile } from "node:process";
 import { defineConfig, devices } from "@playwright/test";
+import { requireTestDatabaseUrl } from "./e2e/require-test-database";
 
 try {
   loadEnvFile();
@@ -10,10 +11,9 @@ try {
 // Dedicated port so E2E runs never collide with a manually started dev server.
 const PORT = 3799;
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-if (!testDatabaseUrl || !/_test(\?|$)/.test(new URL(testDatabaseUrl).pathname)) {
-  throw new Error("TEST_DATABASE_URL must point at a *_test database for e2e runs");
-}
+// Refused at configuration load, before global setup or the server starts
+// (finding C; verification item 25). Covered by tests/config/e2e-database-guard.test.ts.
+const testDatabaseUrl = requireTestDatabaseUrl(process.env.TEST_DATABASE_URL);
 
 export default defineConfig({
   testDir: "e2e",
