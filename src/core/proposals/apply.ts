@@ -122,7 +122,7 @@ export async function applyProposal(db: PrismaClient, proposalId: string): Promi
               op.entityType,
               op.entityId,
               op.expectedRevision!,
-              manifest?.aliases ?? [],
+              manifest ?? { aliases: [], peopleIds: [] },
             );
             postRevision = null;
             break;

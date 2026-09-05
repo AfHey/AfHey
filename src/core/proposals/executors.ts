@@ -16,6 +16,7 @@ import {
   stripUndefined,
   toEventData,
   toTaskData,
+  uniquePeople,
 } from "@/core/domain/mutations";
 import { normalizeLookupKey } from "@/core/domain/normalize";
 import type {
@@ -117,7 +118,11 @@ export async function executeCreate(
       const input = payload as TaskCreateInput;
       await assertProjectRefIsProject(tx, input.projectId);
       await tx.task.create({
-        data: { ...toTaskData(input), id: entityId } as Prisma.TaskUncheckedCreateInput,
+        data: {
+          ...(toTaskData(input) as Prisma.TaskUncheckedCreateInput),
+          id: entityId,
+          people: { create: uniquePeople(input.peopleIds).map((personId) => ({ personId })) },
+        },
       });
       return;
     }
@@ -240,11 +245,16 @@ export async function executeSetArchived(
 
 // --- delete (conflict-aware undo of a create; spec §9.5, §11.2 rule 9) -----
 
+export interface DeleteManifest {
+  aliases: string[];
+  peopleIds: string[];
+}
+
 export async function collectDeleteBlockers(
   tx: Tx,
   entityType: EntityType,
   entityId: string,
-  manifestAliases: string[],
+  manifest: DeleteManifest,
 ): Promise<string[]> {
   const blockers: string[] = [];
   switch (entityType) {
@@ -252,11 +262,13 @@ export async function collectDeleteBlockers(
       const [sessions, blocks, links] = await Promise.all([
         tx.workSession.count({ where: { taskId: entityId } }),
         tx.event.count({ where: { taskId: entityId } }),
-        tx.taskPerson.count({ where: { taskId: entityId } }),
+        tx.taskPerson.findMany({ where: { taskId: entityId }, select: { personId: true } }),
       ]);
       if (sessions) blockers.push(`${sessions} work session(s) reference the task`);
       if (blocks) blockers.push(`${blocks} block event(s) reference the task`);
-      if (links) blockers.push(`${links} person link(s) were added to the task`);
+      const expected = new Set(manifest.peopleIds);
+      const added = links.filter((l) => !expected.has(l.personId)).length;
+      if (added) blockers.push(`${added} person link(s) were added to the task after creation`);
       break;
     }
     case "event": {
@@ -280,7 +292,7 @@ export async function collectDeleteBlockers(
         blockers.push(`${taskLinks + eventLinks} task/event link(s) reference the person`);
       }
       const current = new Set(aliases.map((a) => a.normalizedAlias));
-      const expected = new Set(manifestAliases);
+      const expected = new Set(manifest.aliases);
       const unexpected = [...current].filter((a) => !expected.has(a));
       if (unexpected.length > 0) {
         blockers.push(`alias(es) added after creation: ${unexpected.join(", ")}`);
@@ -309,10 +321,10 @@ export async function executeDelete(
   entityType: EntityType,
   entityId: string,
   expectedRevision: number,
-  manifestAliases: string[],
+  manifest: DeleteManifest,
 ): Promise<void> {
   await lockAndCheck(tx, entityType, entityId, expectedRevision);
-  const blockers = await collectDeleteBlockers(tx, entityType, entityId, manifestAliases);
+  const blockers = await collectDeleteBlockers(tx, entityType, entityId, manifest);
   if (blockers.length > 0) {
     conflict({
       entityType,
@@ -324,7 +336,12 @@ export async function executeDelete(
   try {
     if (entityType === "person") {
       await tx.personAlias.deleteMany({
-        where: { personId: entityId, normalizedAlias: { in: manifestAliases } },
+        where: { personId: entityId, normalizedAlias: { in: manifest.aliases } },
+      });
+    }
+    if (entityType === "task") {
+      await tx.taskPerson.deleteMany({
+        where: { taskId: entityId, personId: { in: manifest.peopleIds } },
       });
     }
     await delegateFor(tx, entityType).delete({ where: { id: entityId } });

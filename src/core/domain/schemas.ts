@@ -43,6 +43,7 @@ export const taskFieldsSchema = z.object({
   location: optionalText,
   context: optionalText,
   projectId: z.uuid().nullish(),
+  captureId: z.uuid().nullish(),
   deadlineDate: isoDate.nullish(),
   deadlineAt: isoInstant.nullish(),
   deadlineTimezone: timezone.nullish(),
@@ -66,6 +67,10 @@ export const taskFieldsSchema = z.object({
 });
 
 export const taskCreateSchema = taskFieldsSchema
+  .extend({
+    /** Persons linked through TaskPerson at creation (spec §9.1). */
+    peopleIds: z.array(z.uuid()).max(20),
+  })
   .partial()
   .required({ title: true })
   .superRefine((input, ctx) => {
@@ -123,6 +128,7 @@ export const eventFieldsSchema = z.object({
   allDayEndDate: isoDate.nullish(),
   timezone,
   projectId: z.uuid().nullish(),
+  captureId: z.uuid().nullish(),
   description: optionalText,
   location: optionalText,
   notes: optionalText,
@@ -164,6 +170,7 @@ export const noteCreateSchema = z.object({
   body: trimmed,
   title: optionalText,
   projectId: z.uuid().nullish(),
+  captureId: z.uuid().nullish(),
 });
 export const noteUpdateSchema = noteCreateSchema.partial();
 

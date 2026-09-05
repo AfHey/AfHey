@@ -398,6 +398,37 @@ describe("conflict-aware undo", () => {
     expect(await db.person.findUnique({ where: { id: proposal.operations[0].entityId } })).not.toBeNull();
   });
 
+  it("undoes a task created with people links, but not after a link was added", async () => {
+    const person = await db.person.create({ data: { name: "Linked Person" } });
+    const other = await db.person.create({ data: { name: "Other Person" } });
+    const build = () =>
+      buildProposal(db, {
+        origin: "inbox",
+        idempotencyKey: nextKey(),
+        operations: [
+          { op: "create", entityType: "task", after: { title: "linked task", peopleIds: [person.id] } },
+        ],
+      });
+
+    const clean = await build();
+    const cleanAction = actionOf(await approvedApply(clean.id));
+    expect(await db.taskPerson.count({ where: { taskId: clean.operations[0].entityId } })).toBe(1);
+    const undo = await buildUndoProposal(db, cleanAction.id, nextKey());
+    expect(undo.status).toBe("pending");
+    actionOf(await approvedApply(undo.id));
+    expect(await db.task.findUnique({ where: { id: clean.operations[0].entityId } })).toBeNull();
+    expect(await db.taskPerson.count({ where: { taskId: clean.operations[0].entityId } })).toBe(0);
+
+    const touched = await build();
+    const touchedAction = actionOf(await approvedApply(touched.id));
+    await db.taskPerson.create({
+      data: { taskId: touched.operations[0].entityId, personId: other.id },
+    });
+    const blocked = await buildUndoProposal(db, touchedAction.id, nextKey());
+    expect(blocked.status).toBe("conflicted");
+    expect(JSON.stringify(blocked.conflictDetails)).toContain("person link");
+  });
+
   it("batch undo conflicts as a whole: no member is deleted", async () => {
     const proposal = await buildProposal(db, {
       origin: "inbox",

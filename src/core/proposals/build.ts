@@ -56,19 +56,27 @@ interface PendingCreate {
   kind?: "area" | "project";
 }
 
+type RefWant = "project" | "area" | "person" | "capture";
+
 function referencesOf(
   op: OperationType,
   entityType: EntityType,
   payload: unknown,
-): Array<{ field: string; id: string; want: "project" | "area" | "person" }> {
+): Array<{ field: string; id: string; want: RefWant }> {
   if (op !== "create" && op !== "update") return [];
   const p = payload as Record<string, unknown>;
-  const refs: Array<{ field: string; id: string; want: "project" | "area" | "person" }> = [];
+  const refs: Array<{ field: string; id: string; want: RefWant }> = [];
   if (entityType === "task" || entityType === "event" || entityType === "note") {
     if (typeof p.projectId === "string") refs.push({ field: "projectId", id: p.projectId, want: "project" });
+    if (typeof p.captureId === "string") refs.push({ field: "captureId", id: p.captureId, want: "capture" });
   }
   if (entityType === "task" && typeof p.waitingForPersonId === "string") {
     refs.push({ field: "waitingForPersonId", id: p.waitingForPersonId, want: "person" });
+  }
+  if (entityType === "task" && op === "create" && Array.isArray(p.peopleIds)) {
+    for (const id of p.peopleIds) {
+      if (typeof id === "string") refs.push({ field: "peopleIds", id, want: "person" });
+    }
   }
   if (entityType === "project" && typeof p.parentId === "string") {
     refs.push({ field: "parentId", id: p.parentId, want: "area" });
@@ -170,7 +178,7 @@ export async function buildProposal(
           db as never,
           op.entityType,
           entityId,
-          manifest?.aliases ?? [],
+          manifest ?? { aliases: [], peopleIds: [] },
         );
         for (const blocker of blockers) {
           preconditionConflicts.push({ entityType: op.entityType, entityId, reason: blocker });
@@ -196,6 +204,9 @@ export async function buildProposal(
       if (ref.want === "person") {
         const person = await db.person.findUnique({ where: { id: ref.id } });
         if (!person) problems.push(`operation ${index}: ${ref.field} refers to unknown person ${ref.id}`);
+      } else if (ref.want === "capture") {
+        const capture = await db.capture.findUnique({ where: { id: ref.id } });
+        if (!capture) problems.push(`operation ${index}: ${ref.field} refers to unknown capture ${ref.id}`);
       } else {
         const project = await db.project.findUnique({ where: { id: ref.id } });
         if (!project || project.kind !== ref.want) {

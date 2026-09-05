@@ -311,7 +311,7 @@ describe("interpretExtraction", () => {
     expect(applied.outcome).toBe("applied");
     const note = await db.note.findUniqueOrThrow({ where: { id: proposal.operations[0].entityId } });
     expect(note.body).toBe("grout cures in 72 hours");
-    expect(note.captureId).toBeNull(); // linkage arrives via capture_id in Step 12 wiring
+    expect(note.captureId).toBe(capture.id);
     const refreshed = await db.capture.findUniqueOrThrow({ where: { id: capture.id } });
     expect(refreshed.processingStatus).toBe("processed");
     expect(refreshed.rawDeleteAfter).not.toBeNull();
@@ -341,13 +341,22 @@ describe("processCaptureWithExtraction (fake provider)", () => {
     const [task, note] = outcome.proposal!.operations;
     expect(task.entityType).toBe("task");
     expect((task.after as { deadlineDate: string }).deadlineDate).toBe("2026-09-02");
+    expect((task.after as { peopleIds: string[] }).peopleIds).toEqual([person.id]);
+    expect((task.after as { captureId: string }).captureId).toBe(capture.id);
     expect(note.entityType).toBe("note");
-    // The people reference was kept as evidence with the resolved candidate.
     const peopleEvidence = await db.fieldEvidence.findFirst({
       where: { proposalOperationId: task.operationId, fieldPath: "people" },
     });
     expect(peopleEvidence?.resolverMeta).toMatchObject({ candidateIds: [person.id] });
     expect(peopleEvidence?.literalText).toBe("[PERSON_1]");
+
+    // Applying creates the TaskPerson link and the source linkage.
+    await approveProposal(db, outcome.proposal!.id);
+    expect((await applyProposal(db, outcome.proposal!.id)).outcome).toBe("applied");
+    const links = await db.taskPerson.findMany({ where: { taskId: task.entityId } });
+    expect(links.map((l) => l.personId)).toEqual([person.id]);
+    const createdTask = await db.task.findUniqueOrThrow({ where: { id: task.entityId } });
+    expect(createdTask.captureId).toBe(capture.id);
   });
 
   it("marks the capture failed when the provider fails, with no proposal", async () => {

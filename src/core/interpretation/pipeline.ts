@@ -114,6 +114,8 @@ function orderItems(items: ExtractionItem[]): { ordered: ExtractionItem[]; cycli
 
 interface Refs {
   single(field: string): { id: string; confidence: Confidence } | "ambiguous" | null;
+  /** All unambiguous candidates for a field, plus whether any were ambiguous. */
+  many(field: string): { ids: string[]; ambiguous: boolean };
 }
 
 function referenceLookup(item: ExtractionItem): Refs {
@@ -123,6 +125,15 @@ function referenceLookup(item: ExtractionItem): Refs {
       if (!ref || ref.candidate_ids.length === 0) return null;
       if (ref.candidate_ids.length > 1) return "ambiguous";
       return { id: ref.candidate_ids[0], confidence: ref.confidence };
+    },
+    many(field) {
+      const ids: string[] = [];
+      let ambiguous = false;
+      for (const ref of item.entity_references.filter((r) => r.field === field)) {
+        if (ref.candidate_ids.length === 1) ids.push(ref.candidate_ids[0]);
+        else if (ref.candidate_ids.length > 1) ambiguous = true;
+      }
+      return { ids: [...new Set(ids)], ambiguous };
     },
   };
 }
@@ -204,6 +215,24 @@ export async function interpretExtraction(
           continue;
         }
         let taskKind = oneOf<"action" | "waiting_for" | "reminder">(f.task_kind, TASK_KINDS) ?? "action";
+        // People involved (spec §3): unambiguous references and proposed
+        // person items become TaskPerson links; ambiguous ones are flagged.
+        const people = refs.many("people");
+        const peopleIds = [...people.ids];
+        for (const ref of item.depends_on_item_refs) {
+          const dep = prepared.get(ref);
+          if (dep && dep.item.entity_type === "person" && !peopleIds.includes(dep.entityId)) {
+            peopleIds.push(dep.entityId);
+          }
+        }
+        if (people.ambiguous) {
+          warnings.push({
+            itemRef: item.item_ref,
+            message: "a person mention matched several people; confirm who is involved at review",
+            severity: "needs_confirmation",
+          });
+          confidences.push("needs_confirmation");
+        }
         const payload: Partial<TaskCreateInput> & { title: string } = {
           title,
           taskKind,
@@ -213,6 +242,8 @@ export async function interpretExtraction(
           location: str(f.location),
           context: str(f.context),
           projectId,
+          captureId: input.captureId,
+          peopleIds,
           estimatedDurationMinutes: posInt(f.estimated_duration_minutes),
           isSplittable: bool(f.is_splittable) ?? false,
           isSchedulable: bool(f.is_schedulable) ?? true,
@@ -353,7 +384,14 @@ export async function interpretExtraction(
             op: "create",
             entityType: "task",
             entityId,
-            after: { title, projectId, location: str(f.location), notes: str(f.notes), confidence: "needs_confirmation" },
+            after: {
+              title,
+              projectId,
+              captureId: input.captureId,
+              location: str(f.location),
+              notes: str(f.notes),
+              confidence: "needs_confirmation",
+            },
             dependsOnSequences,
           };
           duplicateCandidate = { itemRef: item.item_ref, entityType: "task", title, projectId, dueDate: null };
@@ -366,6 +404,7 @@ export async function interpretExtraction(
           isLocked: false,
           timezone: zone,
           projectId,
+          captureId: input.captureId,
           location: str(f.location),
           description: str(f.description),
           notes: str(f.notes),
@@ -413,6 +452,7 @@ export async function interpretExtraction(
           body,
           title: str(f.body) ? str(f.title) : null,
           projectId,
+          captureId: input.captureId,
         };
         draft = { op: "create", entityType: "note", entityId, after: payload, dependsOnSequences };
         duplicateCandidate = {

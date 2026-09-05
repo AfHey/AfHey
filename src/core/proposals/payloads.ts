@@ -42,8 +42,16 @@ const updateSchemas: Record<EntityType, ZodType> = {
   project: nonEmpty(projectUpdateSchema),
 };
 
+/**
+ * What an undo-delete expects to find and remove alongside the row: the
+ * person aliases or task people-links created by the original create. Any
+ * extra row is an acquired dependent and blocks the delete.
+ */
 export const deleteManifestSchema = z
-  .object({ aliases: z.array(z.string()).default([]) })
+  .object({
+    aliases: z.array(z.string()).default([]),
+    peopleIds: z.array(z.string()).default([]),
+  })
   .optional();
 
 export function parseOperationPayload(

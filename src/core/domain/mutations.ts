@@ -55,6 +55,7 @@ export function toTaskData(input: TaskUpdateInput) {
     location: input.location,
     context: input.context,
     projectId: input.projectId,
+    captureId: input.captureId,
     deadlineDate: isoDateOrNull(input.deadlineDate),
     deadlineAt: dateOrNull(input.deadlineAt),
     deadlineTimezone: input.deadlineTimezone,
@@ -113,8 +114,17 @@ async function guardedUpdate<T>(
 export async function createTaskDirect(db: PrismaClient, input: TaskCreateInput) {
   return db.$transaction(async (tx) => {
     await assertProjectRefIsProject(tx, input.projectId);
-    return tx.task.create({ data: toTaskData(input) as Prisma.TaskUncheckedCreateInput });
+    return tx.task.create({
+      data: {
+        ...(toTaskData(input) as Prisma.TaskUncheckedCreateInput),
+        people: { create: uniquePeople(input.peopleIds).map((personId) => ({ personId })) },
+      },
+    });
   });
+}
+
+export function uniquePeople(peopleIds: string[] | undefined): string[] {
+  return [...new Set(peopleIds ?? [])];
 }
 
 export async function updateTaskDirect(db: PrismaClient, id: string, input: TaskUpdateInput) {
@@ -168,6 +178,7 @@ export function toEventData(input: EventUpdateInput) {
     allDayEndDate: isoDateOrNull(input.allDayEndDate),
     timezone: input.timezone,
     projectId: input.projectId,
+    captureId: input.captureId,
     description: input.description,
     location: input.location,
     notes: input.notes,

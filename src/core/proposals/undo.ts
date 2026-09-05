@@ -53,14 +53,17 @@ export async function buildUndoProposal(
     };
     switch (snapshot.op) {
       case "create": {
-        const aliases =
+        const after = (snapshot.after ?? {}) as { aliases?: string[]; peopleIds?: string[] };
+        const manifest =
           entityType === "person"
-            ? ((snapshot.after as { aliases?: string[] })?.aliases ?? []).map(normalizeLookupKey)
-            : [];
+            ? { aliases: (after.aliases ?? []).map(normalizeLookupKey), peopleIds: [] }
+            : entityType === "task"
+              ? { aliases: [], peopleIds: [...new Set(after.peopleIds ?? [])] }
+              : undefined;
         operations.push({
           ...base,
           op: "delete",
-          after: entityType === "person" ? { aliases } : undefined,
+          after: manifest,
           expectedRevisionOverride: snapshot.postRevision ?? 1,
         });
         break;
