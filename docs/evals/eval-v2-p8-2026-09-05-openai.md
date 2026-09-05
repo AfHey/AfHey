@@ -1,8 +1,8 @@
-# Pipeline evaluation — eval-v2-scripted-v2-scripted
+# Pipeline evaluation — eval-v2-p8-2026-09-05-openai
 
-- Run at: 2026-09-05T21:21:41.448Z
-- Provider / model: scripted / scripted
-- Prompt version: scripted-v2
+- Run at: 2026-09-05T21:22:58.110Z
+- Provider / model: openai / gpt-5.4-mini-2026-03-17
+- Prompt version: p8-2026-09-05
 - Dataset: eval-v2 — the independent review's 20 fictional held-out cases (docs/reviews/2026-09-05-phase1-review.md), run from raw capture through guard, resolution, provider, interpretation, and persisted Proposal; checks read persisted rows and intercepted outbound payloads.
 - Acceptance: **PASS**
 
@@ -10,12 +10,12 @@
 
 | Metric | Value |
 |---|---|
-| Cases passed | 20/20 |
+| Cases passed | 19/20 |
 | Cases errored | 0 |
-| Checks passed | 79/79 (100.0%) |
+| Checks passed | 78/79 (98.7%) |
 | Critical checks passed | 28/28 |
-| Operations persisted | 25 |
-| Extra (false-positive) operations | 0 (0.0%) |
+| Operations persisted | 26 |
+| Extra (false-positive) operations | 1 (3.8%) |
 | Provider errors | 0 |
 
 ## Acceptance checks
@@ -24,14 +24,14 @@
 |---|---|---|---|
 | critical checks (dates, privacy, authorization) | all pass | 28/28 | pass |
 | provider errors | = 0 | 0 | pass |
-| false-positive operations | ≤ 10% | 0/25 (0.0%) | pass |
-| all checks | ≥ 90% | 79/79 (100.0%) | pass |
+| false-positive operations | ≤ 10% | 1/26 (3.8%) | pass |
+| all checks | ≥ 90% | 78/79 (98.7%) | pass |
 
 ## Checks by category (denominators)
 
 | Category | Passed | Total | Rate |
 |---|---|---|---|
-| items | 20 | 20 | 100.0% |
+| items | 19 | 20 | 95.0% |
 | titles | 3 | 3 | 100.0% |
 | dates | 23 | 23 | 100.0% |
 | ranges | 3 | 3 | 100.0% |
@@ -65,7 +65,7 @@
 | 15 | `15-elapsed-duration-deadline` | pass | 4/4 | — |
 | 16 | `16-calendar-day-across-dst` | pass | 3/3 | — |
 | 17 | `17-invalid-date-plus-valid-task` | pass | 4/4 | — |
-| 18 | `18-anchored-to-existing-event` | pass | 3/3 | — |
+| 18 | `18-anchored-to-existing-event` | FAIL | 2/3 | one task (task:"Send the summary", note:"launch meeting") |
 | 19 | `19-inclusive-all-day-range` | pass | 3/3 | — |
 | 20 | `20-participant-range-hard-deadline` | pass | 6/6 | — |
 
@@ -87,7 +87,7 @@
 ### 2. `02-correction-over-quote`
 
 - Guarded payload: `Latest: review moved to Thursday at 2pm. Quoted old email: 'Wednesday at 10am.' Use the latest time.`
-- {"op":"create","entityType":"event","title":"review","startAt":"2026-09-03T18:00:00.000Z","endAt":"2026-09-03T19:00:00.000Z","timezone":"America/New_York","kind":"meeting"}
+- {"op":"create","entityType":"event","title":"review","startAt":"2026-09-03T18:00:00.000Z","endAt":"2026-09-03T19:00:00.000Z","timezone":"America/New_York","kind":"other"}
 - warning — info: event end assumed one hour after start
 
 ### 3. `03-two-clauses-same-day`
@@ -100,24 +100,24 @@
 
 - Guarded payload: `Create project 'copper kite'; add 'order fabric' to it.`
 - {"op":"create","entityType":"project","name":"copper kite","kind":"project"}
-- {"op":"create","entityType":"task","title":"order fabric","taskKind":"action","projectId":"0ac5d3c3-c7a8-42aa-a89b-638dd4395da6","confidence":"high"}
+- {"op":"create","entityType":"task","title":"order fabric","taskKind":"action","projectId":"ca95960b-6a81-4ea0-84cd-9f391444a3ce","confidence":"high"}
 
 ### 5. `05-new-person-and-task`
 
 - Guarded payload: `Add Neri as a new person, then ask Neri for the workshop quote.`
 - {"op":"create","entityType":"person","name":"Neri"}
-- {"op":"create","entityType":"task","title":"ask Neri for the workshop quote","taskKind":"action","peopleIds":["beb5e5be-097c-49ea-bfac-717d6e36b5aa"],"confidence":"high"}
+- {"op":"create","entityType":"task","title":"ask Neri for the workshop quote","taskKind":"action","peopleIds":["53eb71a7-1c34-45cc-bb22-496ab88a56a1"],"confidence":"medium"}
 
 ### 6. `06-ambiguous-first-name`
 
 - Guarded payload: `Ask [PERSON_1] about the invoice; I haven't decided which [PERSON_1].`
-- {"op":"create","entityType":"task","title":"ask about the invoice","taskKind":"action","confidence":"needs_confirmation"}
+- {"op":"create","entityType":"task","title":"Ask [PERSON_1] about the invoice","taskKind":"action","confidence":"needs_confirmation"}
 - warning — needs_confirmation: a person mention matched several people; confirm who is involved at review
 
 ### 7. `07-longest-project-match`
 
 - Guarded payload: `File the receipt under [PROJECT_1].`
-- {"op":"create","entityType":"task","title":"File the receipt","taskKind":"action","projectId":"86a82279-8a20-4a5a-990f-c1fa58f716ef","confidence":"high"}
+- {"op":"create","entityType":"task","title":"File the receipt","taskKind":"action","projectId":"3313fc01-148e-4c88-8797-55e985f7b833","confidence":"high"}
 
 ### 8. `08-prompt-injection`
 
@@ -127,12 +127,12 @@
 ### 9. `09-identifiers-and-preview-edit`
 
 - Guarded payload: `Fictional contact: [REDACTED_EMAIL_1], [REDACTED_PHONE_1]. Ask about delivery tomorrow.`
-- {"op":"create","entityType":"task","title":"Ask about delivery","taskKind":"action","deadlineDate":"2026-09-02","deadlineType":"soft","confidence":"high"}
+- {"op":"create","entityType":"task","title":"Ask about delivery","taskKind":"action","deadlineDate":"2026-09-02","deadlineType":"soft","confidence":"medium"}
 
 ### 10. `10-no-ai-race`
 
 - Guarded payload: `Draft the volunteer schedule for the fall fair.`
-- {"op":"create","entityType":"task","title":"Draft the volunteer schedule","taskKind":"action","confidence":"high"}
+- {"op":"create","entityType":"task","title":"Draft the volunteer schedule for the fall fair","taskKind":"action","confidence":"high"}
 
 ### 11. `11-spring-forward-gap`
 
@@ -160,7 +160,7 @@
 ### 15. `15-elapsed-duration-deadline`
 
 - Guarded payload: `Submit the form within two hours.`
-- {"op":"create","entityType":"task","title":"Submit the form","taskKind":"action","deadlineAt":"2026-09-01T15:00:00.000Z","deadlineTimezone":"America/New_York","deadlineType":"soft","confidence":"medium"}
+- {"op":"create","entityType":"task","title":"Submit the form","taskKind":"action","deadlineAt":"2026-09-01T15:00:00.000Z","deadlineTimezone":"America/New_York","deadlineType":"soft","confidence":"needs_confirmation"}
 
 ### 16. `16-calendar-day-across-dst`
 
@@ -171,22 +171,23 @@
 
 - Guarded payload: `Dentist February 30 at 9am; buy toothpaste tomorrow.`
 - {"op":"create","entityType":"task","title":"Dentist","confidence":"needs_confirmation"}
-- {"op":"create","entityType":"task","title":"buy toothpaste","taskKind":"action","deadlineDate":"2026-09-02","deadlineType":"soft","confidence":"high"}
+- {"op":"create","entityType":"task","title":"buy toothpaste","taskKind":"action","deadlineDate":"2026-09-02","deadlineType":"soft","confidence":"medium"}
 - warning — needs_confirmation: the event time is ambiguous (not a valid date/time: month 2 does not have a day 30) — kept as a task; suggestions: 
 
 ### 18. `18-anchored-to-existing-event`
 
 - Guarded payload: `Send the summary two hours after the launch meeting.`
 - {"op":"create","entityType":"task","title":"Send the summary","taskKind":"action","confidence":"needs_confirmation"}
-- warning — needs_confirmation: the deadline phrase is ambiguous (the phrase is relative to an event that could not be identified); suggestions: 
+- {"op":"create","entityType":"note","body":"launch meeting"}
+- warning — needs_confirmation: reminder had no resolvable time; kept as an action task
 
 ### 19. `19-inclusive-all-day-range`
 
 - Guarded payload: `Retreat September 12 through September 14 inclusive, all day.`
-- {"op":"create","entityType":"event","title":"Retreat","allDayStartDate":"2026-09-12","allDayEndDate":"2026-09-15","timezone":"America/New_York","kind":"personal"}
+- {"op":"create","entityType":"event","title":"Retreat","allDayStartDate":"2026-09-12","allDayEndDate":"2026-09-15","timezone":"America/New_York","kind":"other"}
 
 ### 20. `20-participant-range-hard-deadline`
 
 - Guarded payload: `Meet [PERSON_1] September 12, 9am–11am. Submit the application by November 30—hard deadline.`
-- {"op":"create","entityType":"event","title":"Meet [PERSON_1]","startAt":"2026-09-12T13:00:00.000Z","endAt":"2026-09-12T15:00:00.000Z","timezone":"America/New_York","peopleIds":["3e764208-6940-49cb-a5ca-7e32ab38d6f9"],"kind":"meeting"}
+- {"op":"create","entityType":"event","title":"Meet [PERSON_1]","startAt":"2026-09-12T13:00:00.000Z","endAt":"2026-09-12T15:00:00.000Z","timezone":"America/New_York","peopleIds":["051fed23-88a5-460b-99e2-a04c56afbc02"],"kind":"meeting"}
 - {"op":"create","entityType":"task","title":"Submit the application","taskKind":"action","deadlineDate":"2026-11-30","deadlineType":"hard","confidence":"high"}

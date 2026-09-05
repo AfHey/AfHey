@@ -20,6 +20,10 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Exact Phase 3b text-reasoning model — decide before Phase 3b
 - Hosting and backups — decide before Phase 1 deployment
 - Tier 2 scope thresholds — decide before Phase 3a
+- Fresh, untuned eval-v2 held-out set (the current 20 cases became tuning data; verification 2026-09-05 items 22 and 27) — author independently, run with a frozen pipeline, before treating live results as reliability evidence
+- Distributed rate limiting (finding 15 is closed only for the documented single-instance deployment) — decide with hosting
+- Existing events as temporal anchors ("two hours after the launch meeting" resolves only when events are offered as candidates) — Phase 2 scheduler design
+- Guard: a clause-initial given name that is also a command verb ("Ping Chen called") is not masked by the pair rule (verification item 26) — revisit if a name list or NER ever becomes available
 
 ## 2026-08-30 Release boundaries and phase ownership
 - Decision: V1 ends after Phase 3b (AfHey text); Phase 4 voice is V1.1; Phases 5 and 6 are V2. Basic search belongs to Phase 2. Command palette, keyboard shortcuts, export, and erasure belong to Phase 3b. Weekly review belongs to Phase 5. Day view is Phase 2; week and month views are Phase 5 unless a later decision promotes them. *(Same-day cross-review amendment: the calendar-view sentence was already cited by product-spec §5 but had been omitted here.)*
@@ -246,6 +250,12 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Known limit, stated rather than hidden: a capture that opens with a person whose given name is also a command verb ("Ping Chen called") is indistinguishable from a command and is not masked by the pair rule; honorific and label contexts still catch it.
 - Rejected: the previous position-independent exemption (verification showed the label bypass); removing the exemption entirely (the redaction preview cannot repair "Add Neri" because edits are re-guarded in full).
 - Reason: the exemption exists for one syntactic situation; it must not reach any other.
+
+## 2026-09-05 eval-v2 case 1 temporal scope, and the finding 20 test name (verification items 22 and 27)
+- Decision (product owner): in "Buy printer paper tomorrow—actually, don't; I already ordered it. Buy envelopes instead." the envelopes task is undated — "tomorrow" belonged to the retracted item and does not carry over. eval-v2 case 1 now asserts this as a critical check and forbids any wording about the retracted item in persisted operations; prompt p8 states the same rule for the model.
+- Decision: the finding 20 test is renamed to say what it verifies — an unusable explicit end becomes a provisional one-hour end flagged `needs_confirmation`. The provisional end is an invented fallback accepted only because every Phase 1 proposal is reviewed by hand; the warning is not machine-enforced confirmation, and the fallback must not be reused by automatic scheduling (Phase 2).
+- Open, deliberately not recorded as verified: the 20 eval-v2 cases have been used to tune the prompt and pipeline, so they no longer measure generalization; a fresh, untuned held-out set is required before the live results count as evidence of reliability (see Pending).
+- Reason: an evaluation must assert the intended value, including the absence of a value, or a lucky run passes.
 
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.

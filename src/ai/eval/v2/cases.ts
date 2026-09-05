@@ -172,12 +172,16 @@ export const EVAL_V2_CASES: EvalV2Case[] = [
       scripted([
         item({ item_ref: "envelopes", entity_type: "task", fields: { title: "Buy envelopes" }, field_evidence: fe(t, "title", "Buy envelopes") }),
       ]),
+    note: "Product owner decision (2026-09-05): the envelopes task is undated — 'tomorrow' belonged to the retracted paper task and does not carry over.",
     checks: async (ctx) => {
       const { ops } = single(ctx);
+      const envelopes = ops.find((o) => o.entityType === "task" && /envelope/i.test(titleOf(o)));
       return [
         check("exactly one operation", "items", ops.length === 1, describe(ctx.runs[0])),
         check("no printer-paper task survives the retraction", "items", !ops.some((o) => /paper/i.test(titleOf(o)))),
-        check("envelopes task proposed", "titles", ops.some((o) => o.entityType === "task" && /envelope/i.test(titleOf(o)))),
+        check("envelopes task proposed", "titles", !!envelopes),
+        check("envelopes task carries no date: 'tomorrow' belonged to the retracted item", "dates", !!envelopes && !hasAnyDate(envelopes), JSON.stringify(after(envelopes)), true),
+        check("no operation keeps wording about the retracted paper", "items", !ops.some((o) => /paper/i.test(JSON.stringify(o.after)))),
       ];
     },
   },

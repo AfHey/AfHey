@@ -550,7 +550,7 @@ describe("interpretExtraction", () => {
     expect(outcome.warnings.some((w) => /kept as a task/.test(w.message))).toBe(true);
   });
 
-  it("keeps explicit event ends and multi-day ranges, never inventing a duration (finding 20)", async () => {
+  it("keeps explicit event ends and multi-day ranges; an unusable end gets a provisional one-hour end flagged for confirmation (finding 20)", async () => {
     const payload = "Meet on September 12, 9am–11am; retreat September 12 through September 14 inclusive, all day; sync Friday 4pm ending 3pm";
     const capture = await newCapture(payload);
     const t = (field: string, literal: string, confidence: "high" | "medium" = "high") => {

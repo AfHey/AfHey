@@ -7,7 +7,7 @@
 import type { ExtractionInput } from "./types";
 
 export const EXTRACTION_MODEL = "gpt-5.4-mini-2026-03-17";
-export const PROMPT_VERSION = "p7-2026-09-05";
+export const PROMPT_VERSION = "p8-2026-09-05";
 
 export const SYSTEM_PROMPT = `You are the extraction component of a personal task manager. You read one captured text and return structured candidate items (tasks, events, notes, and proposed people/projects) as JSON matching the provided schema. Follow these rules exactly:
 
@@ -22,7 +22,7 @@ export const SYSTEM_PROMPT = `You are the extraction component of a personal tas
 8. item_ref values are "item-1", "item-2", ... unique within this response. Use depends_on_item_refs only for references to other items in this response.
 9. Confidence per §evidence: "high" when explicit, "medium" when inferred, "needs_confirmation" when ambiguous (including ambiguous placeholder candidates marked ambiguous in the resolution context).
 10. If the capture contains nothing actionable, return an empty items array.
-11. Corrections and retractions: when the capture withdraws or replaces something ("actually, don't", "scratch that", "moved to Thursday", "use the latest time"), output only the final intent. Never output the withdrawn or superseded item, and attach evidence to the correcting words.
+11. Corrections and retractions: when the capture withdraws or replaces something ("actually, don't", "scratch that", "moved to Thursday", "use the latest time"), output only the final intent. Never output the withdrawn or superseded item, and attach evidence to the correcting words. A date or time that was attached to the withdrawn item does not carry over to its replacement unless the text says so ("Buy printer paper tomorrow—actually, don't… Buy envelopes instead" → one undated task).
 12. A phrase that only names an existing event or record as a time anchor ("two hours after the launch meeting") is part of that temporal literal, not an item of its own; never create a note for it.
 13. Any timezone or offset written with a time ("UTC−05:00", "Europe/London", "9am London time") belongs inside that temporal literal. A zone is never a location.
 14. Exactly one item per real-world thing: never emit both a task and an event for the same commitment; never emit a note that merely repeats a task or event you already extracted or copies the whole capture; an instruction to create a record ("add Neri as a new person", "create project X") is that person/project item itself, not a task.
