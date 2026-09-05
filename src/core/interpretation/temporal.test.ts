@@ -1,11 +1,13 @@
 /**
- * Temporal resolution table (plan test list B): relative days, weekdays with
- * qualifiers, vague windows, explicit dates, times with/without meridiem,
- * durations, and the §8.1 DST gap/fold policy. Never a silent assumption.
+ * Temporal resolution table (plan test list B + review findings 10-13):
+ * relative days, weekdays with qualifiers, vague windows, explicit dates,
+ * times with/without meridiem, elapsed vs calendar durations, anchors,
+ * invalid components, explicit zones/offsets, and DST gaps/folds detected by
+ * real offsets (including a 30-minute transition).
  */
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { detectTemporalPhrases, parseDurationMinutes, resolveTemporal } from "./temporal";
+import { detectTemporalPhrases, parseDurationMinutes, resolveTemporal, resolveTemporalRange } from "./temporal";
 
 // Tuesday 2026-09-01 09:00 in New York (EDT, UTC-4).
 const now = DateTime.fromISO("2026-09-01T09:00:00", { zone: "America/New_York" });
@@ -16,44 +18,24 @@ describe("relative days and weekdays", () => {
   it("resolves tomorrow/today and keeps a vague time of day open", () => {
     expect(on("tomorrow")).toMatchObject({ kind: "date", date: "2026-09-02", confidence: "high" });
     expect(on("today")).toMatchObject({ kind: "date", date: "2026-09-01" });
-    expect(on("tomorrow afternoon")).toMatchObject({
-      kind: "date",
-      date: "2026-09-02",
-      confidence: "medium",
-    });
+    expect(on("tomorrow afternoon")).toMatchObject({ kind: "date", date: "2026-09-02", confidence: "medium" });
     expect(on("tonight")).toMatchObject({ kind: "date", date: "2026-09-01", confidence: "medium" });
   });
 
   it("resolves a plain weekday to the upcoming one, but asks when it is today", () => {
     expect(on("Friday")).toMatchObject({ kind: "date", date: "2026-09-04", confidence: "high" });
-    expect(on("Tuesday")).toMatchObject({
-      kind: "needs_confirmation",
-      suggestions: ["2026-09-01", "2026-09-08"],
-    });
+    expect(on("Tuesday")).toMatchObject({ kind: "needs_confirmation", suggestions: ["2026-09-01", "2026-09-08"] });
   });
 
   it("asks about 'next Friday' when two readings exist, resolves when they agree", () => {
-    expect(on("next Friday")).toMatchObject({
-      kind: "needs_confirmation",
-      suggestions: ["2026-09-04", "2026-09-11"],
-    });
+    expect(on("next Friday")).toMatchObject({ kind: "needs_confirmation", suggestions: ["2026-09-04", "2026-09-11"] });
     const saturday = DateTime.fromISO("2026-09-05T10:00:00", { zone: "America/New_York" });
-    expect(resolveTemporal("next Friday", "on", { now: saturday })).toMatchObject({
-      kind: "date",
-      date: "2026-09-11",
-      confidence: "high",
-    });
+    expect(resolveTemporal("next Friday", "on", { now: saturday })).toMatchObject({ kind: "date", date: "2026-09-11", confidence: "high" });
   });
 
   it("treats windows as questions with concrete suggestions", () => {
-    expect(on("this weekend")).toMatchObject({
-      kind: "needs_confirmation",
-      suggestions: ["2026-09-05", "2026-09-06"],
-    });
-    expect(on("next week")).toMatchObject({
-      kind: "needs_confirmation",
-      suggestions: ["2026-09-07", "2026-09-11"],
-    });
+    expect(on("this weekend")).toMatchObject({ kind: "needs_confirmation", suggestions: ["2026-09-05", "2026-09-06"] });
+    expect(on("next week")).toMatchObject({ kind: "needs_confirmation", suggestions: ["2026-09-07", "2026-09-11"] });
     expect(on("end of the week")).toMatchObject({ kind: "needs_confirmation" });
   });
 });
@@ -70,9 +52,21 @@ describe("explicit dates", () => {
   it("assumes next year for a month/day that already passed, at medium confidence", () => {
     expect(on("Aug 15")).toMatchObject({ kind: "date", date: "2027-08-15", confidence: "medium" });
   });
+});
 
-  it("rejects impossible dates", () => {
-    expect(on("Feb 30")).toMatchObject({ kind: "unresolved" });
+describe("invalid components block resolution (finding 13)", () => {
+  it("an invalid date with a valid time does not fall back to today", () => {
+    const result = on("February 30 at 9am");
+    expect(result.kind).toBe("needs_confirmation");
+    if (result.kind === "needs_confirmation") expect(result.reason).toMatch(/not a valid date/);
+  });
+
+  it("a valid day with an invalid time does not become a date-only value", () => {
+    const result = on("tomorrow at 25:00");
+    expect(result.kind).toBe("needs_confirmation");
+    if (result.kind === "needs_confirmation") expect(result.reason).toMatch(/25:00/);
+    expect(on("Feb 30")).toMatchObject({ kind: "needs_confirmation" });
+    expect(on("13pm")).toMatchObject({ kind: "needs_confirmation" });
   });
 });
 
@@ -99,32 +93,68 @@ describe("times", () => {
   });
 
   it("moves a time that already passed today to tomorrow, and says so", () => {
-    expect(on("at 8am")).toMatchObject({
-      kind: "instant",
-      local: "2026-09-02T08:00",
-      note: expect.stringContaining("tomorrow"),
-    });
+    expect(on("at 8am")).toMatchObject({ kind: "instant", local: "2026-09-02T08:00", note: expect.stringContaining("tomorrow") });
+  });
+
+  it("uses the reference day for a time-only phrase when one is given (event ends)", () => {
+    const referenceDay = DateTime.fromISO("2026-09-12T00:00:00", { zone: "America/New_York" });
+    expect(resolveTemporal("11am", "on", { now, referenceDay })).toMatchObject({ kind: "instant", local: "2026-09-12T11:00" });
   });
 });
 
-describe("durations and windows", () => {
-  it("resolves duration_after to now + duration", () => {
-    expect(resolveTemporal("in two hours", "duration_after", ctx)).toMatchObject({
+describe("explicit zones and offsets (finding 11)", () => {
+  it("honors an IANA zone in the text and keeps it", () => {
+    expect(on("September 12 at 9am Europe/London")).toMatchObject({
       kind: "instant",
-      instant: "2026-09-01T15:00:00.000Z",
+      instant: "2026-09-12T08:00:00.000Z",
+      timezone: "Europe/London",
+      local: "2026-09-12T09:00",
       confidence: "high",
-    });
-    expect(resolveTemporal("in three days", "duration_after", ctx)).toMatchObject({
-      kind: "date",
-      date: "2026-09-04",
     });
   });
 
-  it("resolves 'within' to the latest date in the window", () => {
-    expect(resolveTemporal("within two weeks", "within", ctx)).toMatchObject({
+  it("an explicit offset selects the occurrence in a DST fold", () => {
+    expect(on("November 1, 2026 at 1:30am, UTC-05:00")).toMatchObject({
+      kind: "instant",
+      instant: "2026-11-01T06:30:00.000Z",
+      timezone: "America/New_York",
+    });
+    expect(on("November 1, 2026 at 1:30am UTC−04:00")).toMatchObject({ kind: "instant", instant: "2026-11-01T05:30:00.000Z" });
+  });
+
+  it("a contradictory offset asks instead of guessing", () => {
+    expect(on("November 1, 2026 at 1:30am UTC+09:00")).toMatchObject({ kind: "needs_confirmation" });
+  });
+});
+
+describe("durations and anchors (finding 12)", () => {
+  it("elapsed durations keep sub-day precision, including within", () => {
+    expect(resolveTemporal("in two hours", "duration_after", ctx)).toMatchObject({ kind: "instant", instant: "2026-09-01T15:00:00.000Z", confidence: "high" });
+    expect(resolveTemporal("within two hours", "within", ctx)).toMatchObject({ kind: "instant", local: "2026-09-01T11:00", confidence: "medium" });
+  });
+
+  it("calendar durations follow the wall clock across a fall-back day", () => {
+    const halfPastMidnight = DateTime.fromISO("2026-11-01T00:30:00", { zone: "America/New_York" });
+    expect(resolveTemporal("in one day", "duration_after", { now: halfPastMidnight })).toMatchObject({ kind: "date", date: "2026-11-02" });
+    expect(resolveTemporal("in three days", "duration_after", ctx)).toMatchObject({ kind: "date", date: "2026-09-04" });
+    expect(resolveTemporal("within two weeks", "within", ctx)).toMatchObject({ kind: "date", date: "2026-09-15", confidence: "medium" });
+  });
+
+  it("a duration relative to an unidentified anchor is never resolved from now", () => {
+    const result = resolveTemporal("two hours after the launch meeting", "duration_after", ctx);
+    expect(result.kind).toBe("needs_confirmation");
+    if (result.kind === "needs_confirmation") expect(result.reason).toMatch(/event that could not be identified/);
+  });
+
+  it("a validated anchor resolves relative to the anchor", () => {
+    const anchor = DateTime.fromISO("2026-09-10T15:00:00", { zone: "America/New_York" });
+    expect(resolveTemporal("two hours after the launch meeting", "duration_after", { now, anchor: { instant: anchor } })).toMatchObject({
+      kind: "instant",
+      local: "2026-09-10T17:00",
+    });
+    expect(resolveTemporal("a few days before the deadline", "before", { now, anchor: { date: "2026-09-20" } })).toMatchObject({
       kind: "date",
-      date: "2026-09-15",
-      confidence: "medium",
+      date: "2026-09-17",
     });
   });
 
@@ -159,7 +189,7 @@ describe("detectTemporalPhrases", () => {
   });
 });
 
-describe("DST policy (spec §8.1)", () => {
+describe("DST policy (spec §8.1, finding 10)", () => {
   it("a nonexistent spring-forward time needs confirmation with the first valid time after the gap", () => {
     const result = on("March 8, 2026 at 2:30am");
     expect(result.kind).toBe("needs_confirmation");
@@ -173,15 +203,44 @@ describe("DST policy (spec §8.1)", () => {
     const result = on("November 1, 2026 at 1:30am");
     expect(result.kind).toBe("needs_confirmation");
     if (result.kind === "needs_confirmation") {
-      expect(result.reason).toMatch(/occurs twice/);
-      expect(result.suggestions).toEqual([
-        "2026-11-01T01:30:00.000-04:00",
-        "2026-11-01T01:30:00.000-05:00",
-      ]);
+      expect(result.reason).toMatch(/occurs 2 times/);
+      expect(result.suggestions).toEqual(["2026-11-01T01:30:00.000-04:00", "2026-11-01T01:30:00.000-05:00"]);
+    }
+  });
+
+  it("detects a 30-minute fold (Lord Howe Island) that a one-hour assumption misses", () => {
+    const lordHowe = DateTime.fromISO("2026-03-01T09:00:00", { zone: "Australia/Lord_Howe" });
+    const result = resolveTemporal("April 5, 2026 at 1:45am", "on", { now: lordHowe });
+    expect(result.kind).toBe("needs_confirmation");
+    if (result.kind === "needs_confirmation") {
+      expect(result.suggestions).toHaveLength(2);
+      expect(result.suggestions[0]).toContain("+11:00");
+      expect(result.suggestions[1]).toContain("+10:30");
     }
   });
 
   it("an ordinary time on a DST day resolves normally", () => {
     expect(on("March 8, 2026 at 5pm")).toMatchObject({ kind: "instant", local: "2026-03-08T17:00" });
+  });
+});
+
+describe("resolveTemporalRange (finding 20)", () => {
+  it("parses multi-day inclusive ranges", () => {
+    expect(resolveTemporalRange("September 12 through September 14", ctx)).toEqual({ kind: "dates", start: "2026-09-12", endInclusive: "2026-09-14" });
+    expect(resolveTemporalRange("Sept 12–14", ctx)).toEqual({ kind: "dates", start: "2026-09-12", endInclusive: "2026-09-14" });
+  });
+
+  it("parses same-day time ranges with the end on the start's day", () => {
+    const range = resolveTemporalRange("September 12, 9am–11am", ctx);
+    expect(range?.kind).toBe("instants");
+    if (range?.kind === "instants") {
+      expect(range.start.local).toBe("2026-09-12T09:00");
+      expect(range.end.local).toBe("2026-09-12T11:00");
+    }
+  });
+
+  it("returns null for non-ranges", () => {
+    expect(resolveTemporalRange("tomorrow at 5pm", ctx)).toBeNull();
+    expect(resolveTemporalRange("2026-09-06", ctx)).toBeNull();
   });
 });

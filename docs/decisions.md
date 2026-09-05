@@ -161,6 +161,11 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: trusting database existence as authorization for a reference; treating in-bounds offsets as justification; copying evidence onto user-edited values.
 - Reason: the model may only choose among what trusted code offered (spec §14.1), and evidence must justify the specific field it is attached to.
 
+## 2026-09-05 Temporal resolver hardening (findings 10-13)
+- Decision: (10) DST gaps and folds are detected by enumerating the zone's real offsets around the requested wall time, so any transition size is handled (Lord Howe's 30 minutes included). (11) An IANA zone written in the phrase resolves the wall time in that zone and is preserved on the result; an explicit offset (`UTC−05:00`, `-05:00`) selects the matching fold occurrence and is rejected with a confirmation request when it matches none. (12) Minute/hour durations keep sub-day precision (including `within`), day/week durations use wall-clock calendar arithmetic, and a duration relative to a named anchor resolves only against a validated anchor — otherwise it requests confirmation and is never computed from now. (13) Day and time components are parsed as absent, valid, or invalid; any invalid component blocks authoritative resolution with a confirmation request.
+- Rejected: fixed one-hour fold detection; ignoring zone text; treating all durations as elapsed minutes; letting an invalid component fall back to "absent".
+- Reason: each rejected shortcut produced a confidently wrong date in the review's reproductions; the spec forbids silent strong assumptions.
+
 ## 2026-09-05 Live extraction enabled
 - Decision: the product owner enabled live OpenAI extraction (`EXTRACTION_PROVIDER=openai`, pinned `gpt-5.4-mini-2026-03-17`, prompt `p2-2026-09-05`) on the basis of the accepted `eval-v1` run. The setting lives in the server environment only; the deterministic fake remains the default for tests and CI. Surprising real captures are to be fictionalized into the next dataset version and the evaluation re-run before any prompt or model change.
 - Rejected: leaving extraction on the fake provider indefinitely; enabling without the evaluation record.
