@@ -13,6 +13,11 @@
   --brass: #8f6e1f;
   --brass-soft: #f0e9d6;
   --danger: #b3402e;
+  /* Work-block states on the calendar (view-model eventColor). */
+  --block-planned: #0b6b63;
+  --block-active: #9a4d0a;
+  --block-missed: #b3402e;
+  --block-done: #6c6875;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,6 +30,10 @@
     --brass: #c9a55c;
     --brass-soft: #322b1c;
     --danger: #e06a54;
+    --block-planned: #4fd1c5;
+    --block-active: #f2a640;
+    --block-missed: #e06a54;
+    --block-done: #99949e;
   }
 }
 
@@ -91,10 +100,51 @@ body {
   }
 }
 
-/* Calendar (Phase 2): block states and derived deadline markers. */
-.afhey-calendar .afhey-flexible { border-style: dashed; }
-.afhey-calendar .afhey-block-missed_unconfirmed {
-  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.35) 6px 8px);
+/* Calendar (Phase 2). FullCalendar's Breezy theme reads its palette from
+   --fc-breezy-* variables and only switches to dark through a
+   data-color-scheme attribute, so the app maps the palette onto its own
+   design tokens here; both themes follow prefers-color-scheme. */
+.afhey-calendar {
+  --fc-breezy-background: var(--surface);
+  --fc-breezy-foreground: var(--ink);
+  --fc-breezy-strong-foreground: var(--ink);
+  --fc-breezy-muted-foreground: var(--ink-soft);
+  --fc-breezy-faint-foreground: var(--ink-soft);
+  --fc-breezy-border: var(--line);
+  --fc-breezy-muted-border: var(--line);
+  --fc-breezy-strong-border: var(--line);
+  --fc-breezy-primary: var(--brass);
+  --fc-breezy-primary-over: var(--brass);
+  --fc-breezy-event: var(--brass);
+  --fc-breezy-event-contrast: var(--surface);
+  --fc-breezy-now: var(--danger);
+  --fc-breezy-highlight: color-mix(in oklab, var(--brass) 18%, transparent);
+  --fc-breezy-selected: color-mix(in oklab, var(--brass) 24%, transparent);
+  --fc-breezy-popover: var(--surface);
+  --fc-breezy-popover-border: var(--line);
 }
-.afhey-calendar .afhey-block-completed { opacity: 0.6; }
+@media (prefers-color-scheme: dark) {
+  .afhey-calendar {
+    --fc-breezy-faint: #ffffff0a;
+    --fc-breezy-muted: #ffffff14;
+    --fc-breezy-strong: #ffffff24;
+    --fc-breezy-stronger: #ffffff30;
+    --fc-breezy-strongest: #ffffff3d;
+  }
+}
+/* Event text always in full ink; the theme's half-mixed colour failed contrast
+   on light backgrounds. Blocks get a solid border in their state colour. */
+.afhey-calendar .afhey-event,
+.afhey-calendar .afhey-event * { color: var(--ink); }
+.afhey-calendar .afhey-event { font-weight: 500; }
+.afhey-calendar .afhey-kind-block {
+  border: 1px solid var(--fc-event-color);
+  border-inline-start-width: 4px;
+  background-color: color-mix(in oklab, var(--fc-event-color) 26%, var(--surface));
+}
+.afhey-calendar .afhey-flexible { border-style: dashed; border-inline-start-style: solid; }
+.afhey-calendar .afhey-block-missed_unconfirmed {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklab, var(--fc-event-color) 45%, transparent) 6px 8px);
+}
+.afhey-calendar .afhey-block-completed { opacity: 0.65; }
 .afhey-calendar .afhey-deadline { font-style: italic; }

@@ -74,6 +74,33 @@ test.describe("calendar (desktop)", () => {
     await expect(eventByTitle(page, title)).toContainText("11:00");
   });
 
+  test("resizing from the top edge saves the new start", async ({ page }) => {
+    const title = `E2E top resize ${stamp}`;
+    await createFixedEvent(page, title, "2026-09-24T14:00:00Z", "2026-09-24T14:30:00Z"); // Thu 10:00–10:30 NY
+    await page.goto("/calendar?date=2026-09-24&view=day");
+    const event = eventByTitle(page, title);
+    await expect(event).toBeVisible();
+    const box = (await event.boundingBox())!;
+    const x = box.x + box.width / 2;
+    await page.mouse.move(x, box.y + box.height / 2);
+    await page.waitForTimeout(200);
+    const edgeY = box.y + 2;
+    await page.mouse.move(x, edgeY);
+    await page.mouse.down();
+    await page.mouse.move(x, edgeY - box.height / 2, { steps: 4 });
+    await page.mouse.move(x, edgeY - box.height, { steps: 10 });
+    await page.mouse.up();
+    await expect(status(page)).toContainText(`Resized "${title}" to Thu 24 Sep 09:30 – 10:30`);
+    await page.reload();
+    await expect(eventByTitle(page, title)).toContainText("09:30");
+  });
+
+  test("planning a day with no free time explains the empty result", async ({ page }) => {
+    await page.goto("/calendar?date=2026-01-05&view=day"); // long past: nothing left to fill
+    await page.getByRole("button", { name: "Plan day" }).click();
+    await expect(page.getByTestId("plan-headline")).toContainText("No free time left in this day");
+  });
+
   test("selecting an empty range creates a fixed event", async ({ page }) => {
     await page.goto("/calendar?date=2026-09-18&view=day"); // Friday, nothing seeded
     await page.locator('[data-time="15:00:00"]').first().scrollIntoViewIfNeeded();

@@ -36,10 +36,7 @@ export function TodayView({ data }: { data: TodayData }) {
   }
 
   const schedule = (body: Record<string, unknown>) =>
-    run(() => apiSend<PlanRunDto>("/api/scheduler", "POST", body), (r) => {
-      setPlan(r);
-      if (!r.proposal) setMessage("Nothing to change: the day is already planned or has no eligible work.");
-    });
+    run(() => apiSend<PlanRunDto>("/api/scheduler", "POST", body), (r) => setPlan(r));
 
   const bands = groupByBand(data.tasks);
   const c = data.capacity;
@@ -109,7 +106,7 @@ export function TodayView({ data }: { data: TodayData }) {
 
       <section aria-labelledby="blocks-heading">
         <h2 id="blocks-heading" className="label mb-1 uppercase">Planned work</h2>
-        {data.blocks.length === 0 ? <p className="text-sm text-ink-soft">No blocks yet — “Plan today” fills the free time with your tasks.</p> : (
+        {data.blocks.length === 0 ? <p className="text-sm text-ink-soft">No planned blocks today, so there is nothing to start yet. “Plan today” places your tasks into free time.</p> : (
           <ul className="divide-y divide-line border-y border-line">
             {data.blocks.map((b) => (
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
@@ -157,7 +154,18 @@ export function TodayView({ data }: { data: TodayData }) {
                       {t.hasBlockToday ? " · planned today" : ""}
                     </span>
                     {t.feasibility === "at_risk" ? <span className="ml-2 text-danger">will not fit before the deadline (short {formatMinutes(t.shortfallMinutes)})</span> : null}
-                    {t.feasibility === "estimate_required" ? <span className="ml-2 text-ink-soft">needs an estimate to be scheduled</span> : null}
+                    {t.feasibility === "estimate_required" ? (
+                      <EstimateForm
+                        title={t.title}
+                        busy={busy}
+                        onSubmit={(minutes) =>
+                          run(
+                            () => apiSend(`/api/tasks/${t.id}`, "PATCH", { remainingEstimateMinutes: minutes, estimatedDurationMinutes: minutes }),
+                            () => setMessage(`Estimated “${t.title}” at ${formatMinutes(minutes)}.`),
+                          )
+                        }
+                      />
+                    ) : null}
                   </span>
                 </li>
               ))}
@@ -202,5 +210,35 @@ function FocusBar({ data, busy, onStop }: { data: TodayData; busy: boolean; onSt
       </span>
       <button type="button" className="btn-primary" disabled={busy} onClick={() => onStop(session.id)}>Stop</button>
     </section>
+  );
+}
+
+/** Inline estimate for a task the scheduler cannot place yet (spec §7.1 item 4). */
+function EstimateForm({ title, busy, onSubmit }: { title: string; busy: boolean; onSubmit: (minutes: number) => void }) {
+  const [value, setValue] = useState("");
+  const minutes = Number.parseInt(value, 10);
+  const valid = Number.isInteger(minutes) && minutes > 0;
+  return (
+    <form
+      className="mt-1 flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid) onSubmit(minutes);
+      }}
+    >
+      <span className="text-ink-soft">needs an estimate to be scheduled:</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={5}
+        step={5}
+        placeholder="min"
+        aria-label={`Estimate for “${title}” in minutes`}
+        className="field w-20"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button type="submit" className="btn-quiet" disabled={busy || !valid}>Set estimate</button>
+    </form>
   );
 }

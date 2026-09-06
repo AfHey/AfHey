@@ -44,22 +44,24 @@ export function eventClassNames(event: Pick<Event, "kind" | "scheduleType" | "is
   return classes;
 }
 
-/** Event colours by kind and state (the theme's own palette colours the rest). */
+/**
+ * Event colours by kind and state, as design tokens (globals.css) so both
+ * themes stay legible; the theme's own palette colours fixed Events.
+ */
 export function eventColor(event: Pick<Event, "kind" | "blockState">): string | undefined {
   if (event.kind !== "block") return undefined;
   switch (event.blockState) {
     case "in_progress":
-      return "#b45309";
+      return "var(--block-active)";
     case "missed_unconfirmed":
-      return "#be123c";
+      return "var(--block-missed)";
     case "completed":
-      return "#6b7280";
+      return "var(--block-done)";
     default:
-      return "#0f766e";
+      return "var(--block-planned)";
   }
 }
 
-/** Returns null for events the calendar cannot place (neither timed nor all-day). */
 export function toCalendarEvent(event: Event): CalendarEventDto | null {
   const base = {
     id: event.id,

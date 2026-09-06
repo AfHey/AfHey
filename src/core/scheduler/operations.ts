@@ -17,7 +17,7 @@ import { deadlineInstant } from "./deadline";
 import { assessFeasibility, type Feasibility } from "./feasibility";
 import { plan, type PlanBlock, type PlanContext, type PlanResult, type PlanTask } from "./plan";
 import { recomputePriorities } from "./priority";
-import { dayStart, freeTime, type Interval } from "./timeline";
+import { dayStart, freeTime, totalMinutes, type Interval } from "./timeline";
 
 export type SchedulerMode = "plan" | "reschedule";
 
@@ -40,6 +40,12 @@ export interface SchedulerSummary {
   unplaced: Array<TaskLabel & { minutes: number; reason: string }>;
   estimateRequired: TaskLabel[];
   feasibility: Array<TaskLabel & Feasibility>;
+  /** Eligible free minutes in the range from now (after buffers); explains an empty plan. */
+  freeMinutes: number;
+  /** Tasks with an estimate that the engine considered. */
+  eligibleTasks: number;
+  /** Eligible tasks already fully covered by kept blocks. */
+  alreadyPlanned: number;
 }
 
 export interface SchedulerRun {
@@ -289,6 +295,20 @@ async function runScheduler(
         });
 
   const feasibility = await feasibilityReport(db, settings, now, tasks);
+  const freeMinutes = totalMinutes(
+    freeTime(
+      { start: Math.max(nowMs, spec.range.start), end: spec.range.end },
+      {
+        zone,
+        availability: ctx.availability,
+        protectedWindows: settings.protected,
+        busy: [...busy, ...kept.map((b) => ({ start: b.start, end: b.end }))],
+        bufferMinutes: settings.preferences.bufferMinutes,
+      },
+    ),
+  );
+  const touched = new Set([...result.placements.map((p) => p.taskId), ...result.unplaced.map((u) => u.taskId)]);
+  const alreadyPlanned = tasks.filter((t) => !touched.has(t.id)).length;
 
   return {
     operation: spec.operation,
@@ -302,6 +322,9 @@ async function runScheduler(
       unplaced: result.unplaced.map((u) => ({ taskId: u.taskId, title: titleOf.get(u.taskId) ?? u.taskId, minutes: u.minutes, reason: u.reason })),
       estimateRequired,
       feasibility,
+      freeMinutes,
+      eligibleTasks: tasks.length,
+      alreadyPlanned,
     },
   };
 }

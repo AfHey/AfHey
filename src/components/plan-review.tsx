@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiSend } from "@/lib/api";
+import { planHeadline, type PlanSummaryDto } from "./plan-headline";
 
 /**
  * Scheduler Proposal review (spec §5.1 item 2, §11.2 rule 11): the change
@@ -25,14 +26,7 @@ export interface PlanOperationDto {
 export interface PlanRunDto {
   operation: string;
   proposal: { id: string; status: string; operations: PlanOperationDto[] } | null;
-  summary: {
-    created: number;
-    moved: number;
-    cancelled: number;
-    unplaced: Array<{ title: string; minutes: number; reason: string }>;
-    estimateRequired: Array<{ title: string }>;
-    feasibility: Array<{ title: string; status: string; shortfallMinutes: number }>;
-  };
+  summary: PlanSummaryDto;
   /** Titles for operations whose payload carries none (moves, cancels). */
   labels: Record<string, string>;
 }
@@ -133,9 +127,7 @@ export function PlanReview({ run, zone, onClose }: { run: PlanRunDto; zone: stri
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="display text-lg font-semibold">Proposed plan</h3>
-          <p className="text-sm text-ink-soft">
-            {ops.length === 0 ? "Nothing to change." : `${s.created} to add · ${s.moved} to move · ${s.cancelled} to remove. Nothing is saved until you accept.`}
-          </p>
+          <p className="text-sm text-ink-soft" data-testid="plan-headline">{planHeadline(s, run.operation, ops.length > 0)}</p>
         </div>
         <button type="button" className="btn-quiet" onClick={onClose} aria-label="Close plan">×</button>
       </div>

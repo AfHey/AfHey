@@ -281,6 +281,7 @@ export function CalendarView({
           events={inputs}
           editable
           eventDurationEditable
+          eventResizableFromStart
           selectable
           nowIndicator
           scrollTime="08:00:00"
