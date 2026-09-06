@@ -42,6 +42,12 @@ export default defineConfig({
       // deterministic provider (finding C).
       DATABASE_URL: testDatabaseUrl,
       EXTRACTION_PROVIDER: "fake",
+      // e2e/lan-login.spec.ts reaches the server as http://lan.test to prove
+      // plain-HTTP login from a non-localhost host works in development.
+      AFHEY_DEV_ORIGINS: "lan.test",
+      // Own build directory: `next dev` refuses to start while another dev
+      // server holds the lock in .next/dev, and the suite must not stop it.
+      AFHEY_DIST_DIR: ".next-e2e",
     },
   },
 });

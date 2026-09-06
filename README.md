@@ -54,12 +54,12 @@ To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey
 
 ## Commands
 
-- `npm run dev` — dev server
+- `npm run dev` — dev server. To open it from a phone over the LAN or Tailscale (plain HTTP), list that host in `AFHEY_DEV_ORIGINS` in `.env` (see `.env.example`); Next otherwise blocks its own dev scripts for non-localhost hosts and the login form cannot submit. Development only; `next start` ignores it and keeps the `Secure` cookie.
 - `npm run build` / `npm start` — production build and serve
 - `npm run lint` — ESLint
 - `npm run typecheck` — TypeScript, no emit
 - `npm test` — Vitest unit/integration suites
-- `npm run test:e2e` — Playwright end-to-end tests. Boots its own dev server on port 3799 bound **exclusively to `afhey_test`** (rebuilt, provisioned with `AFHEY_E2E_PASSWORD`, and seeded by the global setup); it never touches `afhey_dev`
+- `npm run test:e2e` — Playwright end-to-end tests. Boots its own dev server on port 3799 bound **exclusively to `afhey_test`** (rebuilt, provisioned with `AFHEY_E2E_PASSWORD`, and seeded by the global setup); it never touches `afhey_dev`, and it builds into `.next-e2e` so it runs alongside a manually started `npm run dev`
 - `npm run test:live` — live-provider tests against the pinned OpenAI model (needs `OPENAI_API_KEY`; not part of `npm test` or CI)
 
 All of `lint`, `typecheck`, `test`, and (once present for the touched area) `test:e2e` run before every commit.
