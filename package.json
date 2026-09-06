@@ -15,7 +15,7 @@
     "provision": "tsx scripts/provision-user.ts",
     "db:unseed": "tsx scripts/unseed.ts",
     "extraction:smoke": "tsx scripts/extraction-smoke.ts",
-    "jobs:expire": "tsx scripts/run-expiry.ts",
+    "jobs:maintenance": "tsx scripts/run-maintenance.ts",
     "eval:extraction": "tsx scripts/run-extraction-eval.ts",
     "eval:pipeline": "tsx scripts/run-pipeline-eval.ts",
     "postinstall": "prisma generate"

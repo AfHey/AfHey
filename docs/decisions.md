@@ -330,3 +330,8 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: trigram or ILIKE search (no ranking, no stemming, full scans); a model for date phrases (rule 2: deterministic code owns dates); returning blocks as hits (duplicates the task); HTML from `ts_headline` (record text would be rendered as markup).
 - Reason: the generated columns and GIN indexes from the Phase 2 migration already exist, so search adds a query and a page rather than a write path or a dependency.
 
+## 2026-09-06 Maintenance job (Phase 2 Step 11)
+- Decision: `npm run jobs:expire` becomes `npm run jobs:maintenance` (`src/jobs/maintenance.ts`), running in order capture-text retention, recovery of interrupted applies, the missed-block transition, and the priority recompute, all against one `now`. None of these is a Proposal: retention and recovery are housekeeping already recorded in Phase 1, a missed block is a fact about the clock (the user still decides what happens to the work through the Today and Calendar prompts), and `computed_priority_score` is derived data that never touches `user_priority`. The screens keep running the missed-block transition on load and the scheduler keeps recomputing priorities before planning, so the job is a backstop rather than the only path.
+- Rejected: separate cron entries per concern (four schedules to keep in step); making the missed transition a Proposal (nothing to approve: the block did end).
+- Reason: one idempotent command is easy to schedule and to run by hand after downtime.
+
