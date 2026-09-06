@@ -25,7 +25,7 @@ export function planHeadline(summary: PlanSummaryDto, operation: string, hasOper
   if (hasOperations) {
     return `${summary.created} to add · ${summary.moved} to move · ${summary.cancelled} to remove. Nothing is saved until you accept.`;
   }
-  const range = operation === "plan_week" ? "week" : "day";
+  const range = operation.startsWith("plan_week") ? "week" : "day";
   const needEstimate = summary.estimateRequired.length;
   if (summary.eligibleTasks === 0 && needEstimate === 0) {
     return "Nothing to place: no open, active, schedulable tasks.";

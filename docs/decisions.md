@@ -335,3 +335,8 @@ Format: date, decision, alternatives rejected, reason. Newest at the bottom.
 - Rejected: separate cron entries per concern (four schedules to keep in step); making the missed transition a Proposal (nothing to approve: the block did end).
 - Reason: one idempotent command is easy to schedule and to run by hand after downtime.
 
+## 2026-09-06 Phase 2 complete; scheduler Proposals live at least a day
+- Decision: scheduler Proposals expire at the end of the planned range **or 24 hours after creation, whichever is later**. The Step 12 flow found that rescheduling yesterday's missed block produced a Proposal whose expiry (end of yesterday) had already passed, so approval was refused with "expired". The range-end rule stays for plans of today or the future. Rejected: no expiry for reschedules (stale plans would linger); expiring at the end of today (the same failure after midnight).
+- Decision: Phase 2 is complete against the exit criteria in `docs/phase-2-plan.md` §10 (2026-09-06). The independent review of spec and code required by spec §15 is requested from the product owner before Phase 3a starts; daily personal use on `afhey_dev` begins now that the fictional seed has been removed from it. The plan's browser-driven roll-over pass is covered by the API-level `roll_over` tests and the calendar reschedule path instead (recorded in the plan's §10).
+- Reason: closes Phase 2 with its evidence in one place and fixes the one blocking defect the end-to-end story surfaced.
+

@@ -66,6 +66,7 @@ interface RunSpec {
 }
 
 const FEASIBILITY_HORIZON_DAYS = 14;
+const MIN_PROPOSAL_LIFE_MS = 24 * 60 * 60 * 1000;
 
 export async function planDay(db: PrismaClient, dateIso: string, options: SchedulerOptions): Promise<SchedulerRun> {
   const settings = await loadSchedulerSettings(db);
@@ -290,7 +291,9 @@ async function runScheduler(
           origin: "scheduler",
           idempotencyKey: options.idempotencyKey ?? `scheduler:${spec.operation}:${newUuid()}`,
           operations,
-          expiresAt: new Date(spec.range.end),
+          // End of the planned range, but never sooner than a day from now: a
+          // missed block is rescheduled from a day that has already ended.
+          expiresAt: new Date(Math.max(spec.range.end, nowMs + MIN_PROPOSAL_LIFE_MS)),
           allowProtectedOverride: options.allowProtectedOverride,
         });
 

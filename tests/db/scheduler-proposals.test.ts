@@ -206,6 +206,20 @@ describe("undo and rescheduling", () => {
     expect((await db.event.findUniqueOrThrow({ where: { id: missed.id } })).blockState).toBe("cancelled");
   });
 
+  it("rescheduling a day that has already ended yields a Proposal that can still be approved", async () => {
+    const friday = "2026-09-04"; // before `now` (Sunday evening)
+    const missed = await db.event.create({
+      data: { title: "Review monitoring notes", kind: "block", scheduleType: "flexible", blockState: "missed_unconfirmed", taskId: ids.study, timezone: NY, startAt: at(friday, "18:00").toJSDate(), endAt: at(friday, "19:00").toJSDate() },
+    });
+    const run = await rescheduleDay(db, friday, { now });
+    expect(run.proposal).not.toBeNull();
+    expect(run.proposal!.expiresAt!.getTime()).toBeGreaterThanOrEqual(now.plus({ hours: 24 }).toMillis());
+    expect(run.proposal!.operations.map((o) => o.entityId)).toContain(missed.id);
+    expect(run.summary.freeMinutes).toBe(0); // nothing left of Friday to fill
+    expect((await approvedApply(run.proposal!.id)).outcome).toBe("applied");
+    expect((await db.event.findUniqueOrThrow({ where: { id: missed.id } })).blockState).toBe("cancelled");
+  });
+
   it("schedule_task touches only that task", async () => {
     const thursday = at("2026-09-10", "00:00");
     const fresh = await db.task.create({ data: { title: "Compare cabinet quotes", projectId: ids.reno, remainingEstimateMinutes: 45, estimatedDurationMinutes: 45, workType: "shallow" } });

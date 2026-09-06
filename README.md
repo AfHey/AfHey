@@ -12,7 +12,7 @@ Read before working on the code:
 
 ## Status
 
-Phase 1 (Foundation) is implemented; see `docs/phase-1-plan.md` §10 for the exit-criteria record. Live AI extraction is off by default (`EXTRACTION_PROVIDER` unset → deterministic fake); the product owner enables it after reviewing `docs/evals/`. CI (`.github/workflows/ci.yml`) runs lint, typecheck, Vitest, and Playwright against a PostgreSQL service with the fake provider.
+Phase 1 (Foundation) and Phase 2 (Time: scheduler, calendar, Today, search, maintenance job) are implemented; see `docs/phase-1-plan.md` §10 and `docs/phase-2-plan.md` §10 for the exit-criteria records. Live AI extraction is off by default (`EXTRACTION_PROVIDER` unset → deterministic fake); the product owner enables it after reviewing `docs/evals/`. CI (`.github/workflows/ci.yml`) runs lint, typecheck, Vitest, and Playwright against a PostgreSQL service with the fake provider.
 
 ## Prerequisites
 
