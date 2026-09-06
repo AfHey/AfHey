@@ -59,6 +59,7 @@ To reset the dev database completely: drop and recreate it (`$PGBIN/dropdb afhey
 - `npm run lint` — ESLint
 - `npm run typecheck` — TypeScript, no emit
 - `npm test` — Vitest unit/integration suites
+- `npm run db:unseed` — removes the fictional seed from the database at `DATABASE_URL` by its fixed ids (decisions.md 2026-09-06); your own rows and the Work/Personal areas and scheduler settings stay
 - `npm run test:e2e` — Playwright end-to-end tests. Boots its own dev server on port 3799 bound **exclusively to `afhey_test`** (rebuilt, provisioned with `AFHEY_E2E_PASSWORD`, and seeded by the global setup); it never touches `afhey_dev`, and it builds into `.next-e2e` so it runs alongside a manually started `npm run dev`
 - `npm run test:live` — live-provider tests against the pinned OpenAI model (needs `OPENAI_API_KEY`; not part of `npm test` or CI)
 

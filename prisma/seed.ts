@@ -9,44 +9,11 @@
  */
 import { createPrismaClient } from "../src/db/client";
 import { loadLocalEnv } from "../src/lib/env";
+import { ID } from "./seed-ids";
 
 loadLocalEnv();
 const db = createPrismaClient();
 
-const ID = {
-  areaWork: "a0000000-0000-4000-8000-000000000001",
-  areaPersonal: "a0000000-0000-4000-8000-000000000002",
-  projectPipeline: "b0000000-0000-4000-8000-000000000001",
-  projectRenovation: "b0000000-0000-4000-8000-000000000002",
-  personPriya: "c0000000-0000-4000-8000-000000000001",
-  personJonas: "c0000000-0000-4000-8000-000000000002",
-  personMarta: "c0000000-0000-4000-8000-000000000003",
-  aliasPriya: "c1000000-0000-4000-8000-000000000001",
-  aliasJonas: "c1000000-0000-4000-8000-000000000002",
-  aliasJW: "c1000000-0000-4000-8000-000000000003",
-  aliasMarta: "c1000000-0000-4000-8000-000000000004",
-  glossaryAdp: "d0000000-0000-4000-8000-000000000001",
-  glossaryReno: "d0000000-0000-4000-8000-000000000002",
-  taskRetryDesign: "e0000000-0000-4000-8000-000000000001",
-  taskTile: "e0000000-0000-4000-8000-000000000002",
-  taskCabinetQuote: "e0000000-0000-4000-8000-000000000003",
-  taskLibraryCard: "e0000000-0000-4000-8000-000000000004",
-  taskVenue: "e0000000-0000-4000-8000-000000000005",
-  eventPipelineSync: "f0000000-0000-4000-8000-000000000001",
-  eventDentist: "f0000000-0000-4000-8000-000000000002",
-  eventTileDelivery: "f0000000-0000-4000-8000-000000000003",
-  noteBacksplash: "90000000-0000-4000-8000-000000000001",
-  noteRetryConstraints: "90000000-0000-4000-8000-000000000002",
-  // Phase 2 (scheduler inputs and tasks with estimates).
-  taskMonitoringNotes: "e0000000-0000-4000-8000-000000000006",
-  taskBudgetUpdate: "e0000000-0000-4000-8000-000000000007",
-  availabilityWeekday: "a2000000-0000-4000-8000-00000000000", // + weekday digit
-  availabilitySaturday: "a2000000-0000-4000-8000-000000000016",
-  jobWeekday: "a2000000-0000-4000-8000-00000000002", // + weekday digit
-  protectedSunday: "a3000000-0000-4000-8000-000000000001",
-  preferredDeep: "a4000000-0000-4000-8000-000000000001",
-  preferredStudy: "a4000000-0000-4000-8000-000000000002",
-} as const;
 
 async function main() {
   // Areas and projects (one area level, spec §6).
